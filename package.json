@@ -3,6 +3,7 @@
   "displayName": "PSL",
   "description": "PSL",
   "version": "0.0.1",
+  "publisher": "Kogler",
   "engines": {
     "vscode": "^1.80.0"
   },
