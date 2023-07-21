@@ -1,0 +1,232 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "Photonic Simulation Language",
+	"patterns": [
+		{
+			"include": "#keywords"
+		},
+		{
+			"include": "#strings"
+		},
+		{
+			"include": "#comments"
+		},
+		{
+			"include": "#numerics"
+		},
+		{
+			"include": "#structures"
+		},
+		{
+			"include": "#supports"
+		},
+		{
+			"include": "#identifiers"
+		},
+		{
+			"include": "#punctuations"
+		}
+	],
+	"repository": {
+		"keywords": {
+			"patterns": [
+				{
+					"name": "entity.name.type.numeric.psl",
+					"match": "\\b(number|int|real|complex|array|matrix)\\b"
+				},
+				{
+					"name": "entity.name.type.prime.psl",
+					"match": "\\b(string|bool|list|dict|any)\\b"
+				},
+				{
+					"name": "constant.language.psl",
+					"match": "\\b(null|true|false)\\b"
+				},
+				{
+					"name": "keyword.control.psl",
+					"match": "\\b(type|enum|func|ret|let|use|as)\\b"
+				},
+				{
+					"name": "storage.modifier.psl",
+					"match": "\\b(inner|sync|scoped|static|atomic)\\b"
+				}
+			]
+		},
+		"strings": {
+			"patterns": [
+				{
+					"name": "string.quoted.double.psl",
+					"begin": "\"",
+					"end": "\"",
+					"patterns": [
+						{
+							"name": "character.escape.psl",
+							"match": "\\\\."
+						}
+					]
+				},
+				{
+					"name": "string.quoted.single.psl",
+					"begin": "'",
+					"end": "'",
+					"patterns": [
+						{
+							"name": "character.escape.psl",
+							"match": "\\\\."
+						}
+					]
+				},
+				{
+					"name": "string.interpolated.psl",
+					"begin": "`",
+					"end": "`",
+					"patterns": [
+						{
+							"name": "character.escape.psl",
+							"match": "\\\\."
+						}
+					]
+				},
+				{
+					"name": "string.quoted.triple.psl",
+					"begin": "\"\"\"",
+					"end": "\"\"\""
+				},
+				{
+					"name": "string.quoted.triple.psl",
+					"begin": "'''",
+					"end": "'''"
+				},
+				{
+					"name": "string.quoted.triple.psl",
+					"begin": "```",
+					"end": "```"
+				}
+			]
+		},
+		"comments": {
+			"patterns": [
+				{
+					"name": "comment.line.double-slash.psl",
+					"match": "//.*$"
+				},
+				{
+					"name": "comment.line.number-sign.psl",
+					"match": "# .*$"
+				},
+				{
+					"name": "comment.block.documentation.psl",
+					"begin": "/\\*",
+					"end": "\\*/"
+				}
+			]
+		},
+		"numerics": {
+			"patterns": [
+				{
+					"name": "constant.numeric.real.psl",
+					"match": "(\\-|\\+)?[\\d]+\\.[\\d]+(e(\\-|\\+)?[\\d]+)?"
+				},
+				{
+					"name": "constant.numeric.integer.psl",
+					"match": "(\\-|\\+)?[\\d]+(e(\\-|\\+)?[\\d]+)?"
+				},
+				{
+					"name": "constant.numeric.complex.psl",
+					"match": "(\\-|\\+)?[\\d]+\\.[\\d]+(e(\\-|\\+)?[\\d]+)?(\\-|\\+)[\\d]+\\.[\\d]+(e(\\-|\\+)?[\\d]+)?i"
+				},
+				{
+					"name": "constant.numeric.complex.psl",
+					"match": "(\\-|\\+)?[\\d]+(e(\\-|\\+)?[\\d]+)?(\\-|\\+)[\\d]+(e(\\-|\\+)?[\\d]+)?i"
+				}
+			]
+		},
+		"identifiers": {
+			"patterns": [
+				{
+					"name": "variable.psl",
+					"match": "\\b[a-zA-Z_]\\w*\\b"
+				}
+			]
+		},
+		"punctuations": {
+			"patterns": [
+				{
+					"name": "variable.parameter.separator.psl",
+					"match": "[\\(\\)\\{\\}\\[\\]<>;,=:\\?]"
+				},
+				{
+					"name": "variable.parameter.operator.psl",
+					"match": "->|:=|.|@"
+				}
+			]
+		},
+		"structures": {
+			"patterns": [
+				{
+					"name": "entity.name.function.psl",
+					"match": "(?<=\\bfunc\\b\\s+)[a-zA-Z_]\\w*"
+				},
+				{
+					"name": "entity.name.type.psl",
+					"match": "(?<=\\btype\\b\\s+)[a-zA-Z_]\\w*"
+				},
+				{
+					"name": "entity.name.type.psl",
+					"match": "(?<=:\\s+)[a-zA-Z_]\\w*"
+				},
+				{
+					"name": "entity.name.type.psl",
+					"match": "(?<=\\bfunc\\b.+->\\s+)[a-zA-Z_]\\w*"
+				},
+				{
+					"name":"markup.italic.psl",
+					"begin": "@",
+					"end": "\\r?\\n|\\)|}|\\]",
+					"patterns": [
+						{
+							"include": "#strings"
+						},
+						{
+							"include": "#numerics"
+						},
+						{
+							"include": "#supports"
+						},
+						{
+							"include": "#identifiers"
+						},
+						{
+							"include": "#punctuations"
+						}
+					]
+				}
+			]
+		},
+		"supports":{
+			"patterns": [
+				{
+					"name": "support.type.psl",
+					"match": "\\b(functor|block|module)\\b"
+				},
+				{
+					"name": "support.function.io.psl",
+					"match": "\\b(print|from|load|save|psl|json|xml)\\b"
+				},
+				{
+					"name": "support.function.engine.psl",
+					"match": "\\b(run|dispatch)\\b"
+				},
+				{
+					"name": "support.function.analyze.psl",
+					"match": "\\b(analyze|eye|hist)\\b"
+				},
+				{
+					"name": "support.function.graphics.psl",
+					"match": "\\b(set_link|set_port|set_bias)\\b"
+				}
+			]
+		}
+	},
+	"scopeName": "source.psl"
+}
