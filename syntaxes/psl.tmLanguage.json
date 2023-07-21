@@ -44,7 +44,7 @@
 				},
 				{
 					"name": "keyword.control.psl",
-					"match": "\\b(type|enum|func|ret|let|use|as)\\b"
+					"match": "\\b(type|enum|func|return|let|use|as)\\b"
 				},
 				{
 					"name": "storage.modifier.psl",
@@ -173,37 +173,25 @@
 				},
 				{
 					"name": "entity.name.type.psl",
-					"match": "(?<=:\\s+)[a-zA-Z_]\\w*"
+					"match": "(?<=:\\s*)[a-zA-Z_]\\w*"
 				},
 				{
 					"name": "entity.name.type.psl",
-					"match": "(?<=\\bfunc\\b.+->\\s+)[a-zA-Z_]\\w*"
+					"match": "(?<=\\bfunc\\b.+->\\s*)[a-zA-Z_]\\w*"
 				},
 				{
-					"name":"markup.italic.psl",
+					"name": "markup.italic.psl",
 					"begin": "@",
-					"end": "\\r?\\n|\\)|}|\\]",
+					"end": "\\)|}|\\]|\\r?\\n",
 					"patterns": [
 						{
-							"include": "#strings"
-						},
-						{
-							"include": "#numerics"
-						},
-						{
-							"include": "#supports"
-						},
-						{
-							"include": "#identifiers"
-						},
-						{
-							"include": "#punctuations"
+							"include": "#inners"
 						}
 					]
 				}
 			]
 		},
-		"supports":{
+		"supports": {
 			"patterns": [
 				{
 					"name": "support.type.psl",
@@ -224,6 +212,28 @@
 				{
 					"name": "support.function.graphics.psl",
 					"match": "\\b(set_link|set_port|set_bias)\\b"
+				}
+			]
+		},
+		"inners": {
+			"patterns": [
+				{
+					"include": "#keywords"
+				},
+				{
+					"include": "#strings"
+				},
+				{
+					"include": "#numerics"
+				},
+				{
+					"include": "#supports"
+				},
+				{
+					"include": "#identifiers"
+				},
+				{
+					"include": "#punctuations"
 				}
 			]
 		}
