@@ -2,7 +2,7 @@
   "name": "psl",
   "displayName": "PSL",
   "description": "PSL",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "publisher": "Kogler",
   "icon": "assets/icon.png",
   "engines": {

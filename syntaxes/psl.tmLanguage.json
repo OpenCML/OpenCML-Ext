@@ -44,11 +44,11 @@
 				},
 				{
 					"name": "keyword.control.psl",
-					"match": "\\b(type|enum|func|return|let|use|as)\\b"
+					"match": "\\b(type|enum|with|func|this|return|let|use|as)\\b"
 				},
 				{
 					"name": "storage.modifier.psl",
-					"match": "\\b(inner|sync|scoped|static|atomic)\\b"
+					"match": "\\b(inner|outer|sync|scoped|static|atomic)\\b"
 				}
 			]
 		},
