@@ -1,6 +1,6 @@
 {
 	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
-	"name": "Photonic Simulation Language",
+	"name": "OpenCML",
 	"patterns": [
 		{
 			"include": "#keywords"
@@ -31,23 +31,23 @@
 		"keywords": {
 			"patterns": [
 				{
-					"name": "entity.name.type.numeric.psl",
+					"name": "entity.name.type.numeric.cml",
 					"match": "\\b(number|int|real|complex|array|matrix)\\b"
 				},
 				{
-					"name": "entity.name.type.prime.psl",
+					"name": "entity.name.type.prime.cml",
 					"match": "\\b(string|bool|list|dict|any)\\b"
 				},
 				{
-					"name": "constant.language.psl",
+					"name": "constant.language.cml",
 					"match": "\\b(null|true|false)\\b"
 				},
 				{
-					"name": "keyword.control.psl",
+					"name": "keyword.control.cml",
 					"match": "\\b(type|enum|with|func|this|return|let|use|as)\\b"
 				},
 				{
-					"name": "storage.modifier.psl",
+					"name": "storage.modifier.cml",
 					"match": "\\b(inner|outer|sync|scoped|static|atomic)\\b"
 				}
 			]
@@ -55,50 +55,50 @@
 		"strings": {
 			"patterns": [
 				{
-					"name": "string.quoted.double.psl",
+					"name": "string.quoted.double.cml",
 					"begin": "\"",
 					"end": "\"",
 					"patterns": [
 						{
-							"name": "character.escape.psl",
+							"name": "character.escape.cml",
 							"match": "\\\\."
 						}
 					]
 				},
 				{
-					"name": "string.quoted.single.psl",
+					"name": "string.quoted.single.cml",
 					"begin": "'",
 					"end": "'",
 					"patterns": [
 						{
-							"name": "character.escape.psl",
+							"name": "character.escape.cml",
 							"match": "\\\\."
 						}
 					]
 				},
 				{
-					"name": "string.interpolated.psl",
+					"name": "string.interpolated.cml",
 					"begin": "`",
 					"end": "`",
 					"patterns": [
 						{
-							"name": "character.escape.psl",
+							"name": "character.escape.cml",
 							"match": "\\\\."
 						}
 					]
 				},
 				{
-					"name": "string.quoted.triple.psl",
+					"name": "string.quoted.triple.cml",
 					"begin": "\"\"\"",
 					"end": "\"\"\""
 				},
 				{
-					"name": "string.quoted.triple.psl",
+					"name": "string.quoted.triple.cml",
 					"begin": "'''",
 					"end": "'''"
 				},
 				{
-					"name": "string.quoted.triple.psl",
+					"name": "string.quoted.triple.cml",
 					"begin": "```",
 					"end": "```"
 				}
@@ -107,15 +107,15 @@
 		"comments": {
 			"patterns": [
 				{
-					"name": "comment.line.double-slash.psl",
+					"name": "comment.line.double-slash.cml",
 					"match": "//.*$"
 				},
 				{
-					"name": "comment.line.number-sign.psl",
+					"name": "comment.line.number-sign.cml",
 					"match": "# .*$"
 				},
 				{
-					"name": "comment.block.documentation.psl",
+					"name": "comment.block.documentation.cml",
 					"begin": "/\\*",
 					"end": "\\*/"
 				}
@@ -124,19 +124,19 @@
 		"numerics": {
 			"patterns": [
 				{
-					"name": "constant.numeric.real.psl",
+					"name": "constant.numeric.real.cml",
 					"match": "(\\-|\\+)?[\\d]+\\.[\\d]+(e(\\-|\\+)?[\\d]+)?"
 				},
 				{
-					"name": "constant.numeric.integer.psl",
+					"name": "constant.numeric.integer.cml",
 					"match": "(\\-|\\+)?[\\d]+(e(\\-|\\+)?[\\d]+)?"
 				},
 				{
-					"name": "constant.numeric.complex.psl",
+					"name": "constant.numeric.complex.cml",
 					"match": "(\\-|\\+)?[\\d]+\\.[\\d]+(e(\\-|\\+)?[\\d]+)?(\\-|\\+)[\\d]+\\.[\\d]+(e(\\-|\\+)?[\\d]+)?i"
 				},
 				{
-					"name": "constant.numeric.complex.psl",
+					"name": "constant.numeric.complex.cml",
 					"match": "(\\-|\\+)?[\\d]+(e(\\-|\\+)?[\\d]+)?(\\-|\\+)[\\d]+(e(\\-|\\+)?[\\d]+)?i"
 				}
 			]
@@ -144,7 +144,7 @@
 		"identifiers": {
 			"patterns": [
 				{
-					"name": "variable.psl",
+					"name": "variable.cml",
 					"match": "\\b[a-zA-Z_]\\w*\\b"
 				}
 			]
@@ -152,11 +152,11 @@
 		"punctuations": {
 			"patterns": [
 				{
-					"name": "variable.parameter.separator.psl",
+					"name": "variable.parameter.separator.cml",
 					"match": "[\\(\\)\\{\\}\\[\\]<>;,=:\\?]"
 				},
 				{
-					"name": "variable.parameter.operator.psl",
+					"name": "variable.parameter.operator.cml",
 					"match": "->|:=|.|@"
 				}
 			]
@@ -164,23 +164,23 @@
 		"structures": {
 			"patterns": [
 				{
-					"name": "entity.name.function.psl",
+					"name": "entity.name.function.cml",
 					"match": "(?<=\\bfunc\\b\\s+)[a-zA-Z_]\\w*"
 				},
 				{
-					"name": "entity.name.type.psl",
+					"name": "entity.name.type.cml",
 					"match": "(?<=\\btype\\b\\s+)[a-zA-Z_]\\w*"
 				},
 				{
-					"name": "entity.name.type.psl",
+					"name": "entity.name.type.cml",
 					"match": "(?<=:\\s*)[a-zA-Z_]\\w*"
 				},
 				{
-					"name": "entity.name.type.psl",
+					"name": "entity.name.type.cml",
 					"match": "(?<=\\bfunc\\b.+->\\s*)[a-zA-Z_]\\w*"
 				},
 				{
-					"name": "markup.italic.psl",
+					"name": "markup.italic.cml",
 					"begin": "@",
 					"end": "\\)|}|\\]|\\r?\\n",
 					"patterns": [
@@ -194,23 +194,23 @@
 		"supports": {
 			"patterns": [
 				{
-					"name": "support.type.psl",
+					"name": "support.type.cml",
 					"match": "\\b(functor|block|module)\\b"
 				},
 				{
-					"name": "support.function.io.psl",
-					"match": "\\b(print|from|load|save|psl|json|xml)\\b"
+					"name": "support.function.io.cml",
+					"match": "\\b(print|from|load|save|cml|json|xml)\\b"
 				},
 				{
-					"name": "support.function.engine.psl",
+					"name": "support.function.engine.cml",
 					"match": "\\b(run|dispatch)\\b"
 				},
 				{
-					"name": "support.function.analyze.psl",
+					"name": "support.function.analyze.cml",
 					"match": "\\b(analyze|eye|hist)\\b"
 				},
 				{
-					"name": "support.function.graphics.psl",
+					"name": "support.function.graphics.cml",
 					"match": "\\b(set_link|set_port|set_bias)\\b"
 				}
 			]
@@ -238,5 +238,5 @@
 			]
 		}
 	},
-	"scopeName": "source.psl"
+	"scopeName": "source.cml"
 }

@@ -1,10 +1,13 @@
 {
-  "name": "psl",
-  "displayName": "PSL",
-  "description": "PSL",
+  "name": "open-cml-extension",
+  "displayName": "OpenCML-Ext",
+  "description": "OpenCML Extension for VSCode",
   "version": "0.0.3",
   "publisher": "Kogler",
-  "icon": "assets/icon.png",
+  "icon": "assets/icon.jpg",
+  "scripts": {
+    "build": "vsce package --out dist"
+  },
   "engines": {
     "vscode": "^1.80.0"
   },
@@ -12,16 +15,41 @@
     "Programming Languages"
   ],
   "contributes": {
-    "languages": [{
-      "id": "psl",
-      "aliases": ["Photonic Simulation Language", "psl"],
-      "extensions": [".psl"],
-      "configuration": "./language-configuration.json"
-    }],
-    "grammars": [{
-      "language": "psl",
-      "scopeName": "source.psl",
-      "path": "./syntaxes/psl.tmLanguage.json"
-    }]
+    "languages": [
+      {
+        "id": "cml",
+        "aliases": [
+          "OpenCML",
+          "cml"
+        ],
+        "extensions": [
+          ".cml"
+        ],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "psl",
+        "aliases": [
+          "Photonic Simulation Language",
+          "psl"
+        ],
+        "extensions": [
+          ".psl"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "cml",
+        "scopeName": "source.cml",
+        "path": "./syntaxes/cml.tmLanguage.json"
+      },
+      {
+        "language": "psl",
+        "scopeName": "source.psl",
+        "path": "./syntaxes/cml.tmLanguage.json"
+      }
+    ]
   }
 }
