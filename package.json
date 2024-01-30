@@ -5,8 +5,9 @@
   "version": "0.0.3",
   "publisher": "Kogler",
   "icon": "assets/icon.jpg",
+  "type": "module",
   "scripts": {
-    "build": "vsce package --out dist"
+    "pub": "node ./publish.js"
   },
   "engines": {
     "vscode": "^1.80.0"

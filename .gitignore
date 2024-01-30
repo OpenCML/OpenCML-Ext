@@ -1,4 +1,4 @@
 .vscode/**
 vsc-extension-quickstart.md
-dist/
+rollup/
 *.vsix
