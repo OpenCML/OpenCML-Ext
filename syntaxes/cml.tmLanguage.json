@@ -195,7 +195,7 @@
 			"patterns": [
 				{
 					"name": "support.type.cml",
-					"match": "\\b(functor|block|module)\\b"
+					"match": "\\b(functor|module)\\b"
 				},
 				{
 					"name": "support.function.io.cml",

@@ -3,7 +3,7 @@ import path from "path"
 import { execSync } from 'child_process'
 
 const outputFolder = "rollup"
-const format = "zip"
+const format = "vsix"
 
 const config = JSON.parse(fs.readFileSync("package.json", "utf8"))
 const version = config.version
