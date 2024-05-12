@@ -200,18 +200,6 @@
 				{
 					"name": "support.function.io.cml",
 					"match": "\\b(print|load|save|cml|json|xml)\\b"
-				},
-				{
-					"name": "support.function.engine.cml",
-					"match": "\\b(run|dispatch)\\b"
-				},
-				{
-					"name": "support.function.analyze.cml",
-					"match": "\\b(analyze|eye|hist)\\b"
-				},
-				{
-					"name": "support.function.graphics.cml",
-					"match": "\\b(set_link|set_port|set_bias)\\b"
 				}
 			]
 		},
