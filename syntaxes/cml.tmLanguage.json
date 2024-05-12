@@ -32,11 +32,11 @@
 			"patterns": [
 				{
 					"name": "entity.name.type.numeric.cml",
-					"match": "\\b(int32|int64|float|double|int|real|number|bool|char|string)\\b"
+					"match": "\\b(Int32|Int64|Float|Double|Int|Real|Number|Bool|Char|String)\\b"
 				},
 				{
 					"name": "entity.name.type.prime.cml",
-					"match": "\\b(set|map|list|dict|tuple|vector|tensor|any|void|functor)\\b"
+					"match": "\\b(Set|Map|List|Dict|Tuple|Vector|Tensor|Any|Void|Functor)\\b"
 				},
 				{
 					"name": "constant.language.cml",
