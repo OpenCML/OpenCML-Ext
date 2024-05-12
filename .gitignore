@@ -2,3 +2,7 @@
 vsc-extension-quickstart.md
 rollup/
 *.vsix
+out
+node_modules
+client/server
+.vscode-test

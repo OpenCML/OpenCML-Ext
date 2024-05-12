@@ -7,6 +7,8 @@
   "icon": "assets/icon.jpg",
   "type": "module",
   "scripts": {
+		"compile": "tsc -b",
+		"watch": "tsc -b -w",
     "pub": "node ./publish.js"
   },
   "engines": {
@@ -19,6 +21,7 @@
     "type": "git",
     "url": "https://github.com/Kogler7/OpenCML-Ext.git"
   },
+	"main": "./client/out/extension",
   "contributes": {
     "languages": [
       {
