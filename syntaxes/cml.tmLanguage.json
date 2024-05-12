@@ -36,7 +36,7 @@
 				},
 				{
 					"name": "entity.name.type.prime.cml",
-					"match": "\\b(Set|Map|List|Dict|Tuple|Vector|Tensor|Any|Void|Functor)\\b"
+					"match": "\\b(Set|Map|List|Dict|Array|Tuple|Vector|Tensor|Any|Void|Functor)\\b"
 				},
 				{
 					"name": "constant.language.cml",
