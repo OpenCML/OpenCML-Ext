@@ -32,11 +32,11 @@
 			"patterns": [
 				{
 					"name": "entity.name.type.numeric.cml",
-					"match": "\\b(number|int|real|complex|array|matrix)\\b"
+					"match": "\\b(int32|int64|float|double|int|real|number|bool|char|string)\\b"
 				},
 				{
 					"name": "entity.name.type.prime.cml",
-					"match": "\\b(string|bool|list|dict|any)\\b"
+					"match": "\\b(set|map|list|dict|tuple|vector|tensor|any|void|functor)\\b"
 				},
 				{
 					"name": "constant.language.cml",
@@ -44,11 +44,11 @@
 				},
 				{
 					"name": "keyword.control.cml",
-					"match": "\\b(type|enum|with|func|this|return|let|use|as)\\b"
+					"match": "\\b(type|with|func|this|return|let|use|as|is|if|else|for|while|from)\\b"
 				},
 				{
 					"name": "storage.modifier.cml",
-					"match": "\\b(inner|outer|sync|scoped|static|atomic)\\b"
+					"match": "\\b(inner|outer|atomic|static|sync)\\b"
 				}
 			]
 		},
@@ -153,11 +153,11 @@
 			"patterns": [
 				{
 					"name": "variable.parameter.separator.cml",
-					"match": "[\\(\\)\\{\\}\\[\\]<>;,=:\\?]"
+					"match": "[\\(\\)\\{\\}\\[\\]<>;,=:@]"
 				},
 				{
 					"name": "variable.parameter.operator.cml",
-					"match": "->|:=|.|@"
+					"match": "->|:=|\\.|=>|\\+|\\-|\\*|/|\\^|%|\\||&|\\||<<|>>|>=|<=|==|!=|\\*=|/=|%=|\\+=|-="
 				}
 			]
 		},
@@ -195,11 +195,11 @@
 			"patterns": [
 				{
 					"name": "support.type.cml",
-					"match": "\\b(functor|module)\\b"
+					"match": "\\b(module)\\b"
 				},
 				{
 					"name": "support.function.io.cml",
-					"match": "\\b(print|from|load|save|cml|json|xml)\\b"
+					"match": "\\b(print|load|save|cml|json|xml)\\b"
 				},
 				{
 					"name": "support.function.engine.cml",

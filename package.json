@@ -2,8 +2,8 @@
   "name": "open-cml-extension",
   "displayName": "OpenCML-Ext",
   "description": "OpenCML Extension for VSCode",
-  "version": "0.0.3",
-  "publisher": "Kogler",
+  "version": "0.1.0",
+  "publisher": "Kogler7",
   "icon": "assets/icon.jpg",
   "type": "module",
   "scripts": {
@@ -15,6 +15,10 @@
   "categories": [
     "Programming Languages"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kogler7/OpenCML-Ext.git"
+  },
   "contributes": {
     "languages": [
       {
