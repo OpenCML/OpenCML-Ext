@@ -16,6 +16,7 @@ import {
 } from 'vscode-languageserver/node'
 
 import { TextDocument } from 'vscode-languageserver-textdocument'
+import { exec } from 'child_process'
 
 // Create a connection for the server, using Node's IPC as a transport.
 // Also include all preview / proposed LSP features.
@@ -81,25 +82,25 @@ connection.onInitialized(() => {
 })
 
 // The example settings
-interface ExampleSettings {
+interface Settings {
     maxNumberOfProblems: number
 }
 
 // The global settings, used when the `workspace/configuration` request is not supported by the client.
 // Please note that this is not the case when using this server with the client provided in this example
 // but could happen with other clients.
-const defaultSettings: ExampleSettings = { maxNumberOfProblems: 1000 }
-let globalSettings: ExampleSettings = defaultSettings
+const defaultSettings: Settings = { maxNumberOfProblems: 1000 }
+let globalSettings: Settings = defaultSettings
 
 // Cache the settings of all open documents
-const documentSettings: Map<string, Thenable<ExampleSettings>> = new Map()
+const documentSettings: Map<string, Thenable<Settings>> = new Map()
 
 connection.onDidChangeConfiguration((change) => {
     if (hasConfigurationCapability) {
         // Reset all cached document settings
         documentSettings.clear()
     } else {
-        globalSettings = <ExampleSettings>(change.settings.languageServerExample || defaultSettings)
+        globalSettings = <Settings>(change.settings.languageServerExample || defaultSettings)
     }
     // Refresh the diagnostics since the `maxNumberOfProblems` could have changed.
     // We could optimize things here and re-fetch the setting first can compare it
@@ -107,7 +108,7 @@ connection.onDidChangeConfiguration((change) => {
     connection.languages.diagnostics.refresh()
 })
 
-function getDocumentSettings(resource: string): Thenable<ExampleSettings> {
+function getDocumentSettings(resource: string): Thenable<Settings> {
     if (!hasConfigurationCapability) {
         return Promise.resolve(globalSettings)
     }
@@ -151,49 +152,83 @@ documents.onDidChangeContent((change) => {
 })
 
 async function validateTextDocument(textDocument: TextDocument): Promise<Diagnostic[]> {
-    // In this simple example we get the settings for every validate run.
-    const settings = await getDocumentSettings(textDocument.uri)
+    const filePath = textDocument.uri.replace('file://', '') // Remove 'file://' prefix
 
-    // The validator creates diagnostics for all uppercase words length 2 and more
-    const text = textDocument.getText()
-    const pattern = /\b[A-Z]{2,}\b/g
-    let m: RegExpExecArray | null
+    return new Promise<Diagnostic[]>((resolve, reject) => {
+        exec(`camel --syntax-only "${filePath}"`, (error, stdout, stderr) => {
+            if (error) {
+                reject(error)
+                return
+            }
 
-    let problems = 0
-    const diagnostics: Diagnostic[] = []
-    while ((m = pattern.exec(text)) && problems < settings.maxNumberOfProblems) {
-        problems++
-        const diagnostic: Diagnostic = {
-            severity: DiagnosticSeverity.Warning,
-            range: {
-                start: textDocument.positionAt(m.index),
-                end: textDocument.positionAt(m.index + m[0].length)
-            },
-            message: `${m[0]} is all uppercase.`,
-            source: 'ex'
-        }
-        if (hasDiagnosticRelatedInformationCapability) {
-            diagnostic.relatedInformation = [
-                {
-                    location: {
-                        uri: textDocument.uri,
-                        range: Object.assign({}, diagnostic.range)
+            const diagnostics: Diagnostic[] = []
+            const errors = stdout.trim().split('\n')
+
+            for (const error of errors) {
+                const { filename, line, column, message } = JSON.parse(error)
+
+                const diagnostic: Diagnostic = {
+                    severity: DiagnosticSeverity.Error,
+                    range: {
+                        start: { line: line - 1, character: column - 1 },
+                        end: { line: line - 1, character: column - 1 }
                     },
-                    message: 'Spelling matters'
-                },
-                {
-                    location: {
-                        uri: textDocument.uri,
-                        range: Object.assign({}, diagnostic.range)
-                    },
-                    message: 'Particularly for names'
+                    message,
+                    source: 'camel'
                 }
-            ]
-        }
-        diagnostics.push(diagnostic)
-    }
-    return diagnostics
+
+                diagnostics.push(diagnostic)
+            }
+
+            resolve(diagnostics)
+        })
+    })
 }
+
+// async function validateTextDocument(textDocument: TextDocument): Promise<Diagnostic[]> {
+//     // In this simple example we get the settings for every validate run.
+//     const settings = await getDocumentSettings(textDocument.uri)
+
+//     // The validator creates diagnostics for all uppercase words length 2 and more
+//     const text = textDocument.getText()
+//     const pattern = /\b[A-Z]{2,}\b/g
+//     let m: RegExpExecArray | null
+
+//     let problems = 0
+//     const diagnostics: Diagnostic[] = []
+//     while ((m = pattern.exec(text)) && problems < settings.maxNumberOfProblems) {
+//         problems++
+//         const diagnostic: Diagnostic = {
+//             severity: DiagnosticSeverity.Warning,
+//             range: {
+//                 start: textDocument.positionAt(m.index),
+//                 end: textDocument.positionAt(m.index + m[0].length)
+//             },
+//             message: `${m[0]} is all uppercase.`,
+//             source: 'ex'
+//         }
+//         if (hasDiagnosticRelatedInformationCapability) {
+//             diagnostic.relatedInformation = [
+//                 {
+//                     location: {
+//                         uri: textDocument.uri,
+//                         range: Object.assign({}, diagnostic.range)
+//                     },
+//                     message: 'Spelling matters'
+//                 },
+//                 {
+//                     location: {
+//                         uri: textDocument.uri,
+//                         range: Object.assign({}, diagnostic.range)
+//                     },
+//                     message: 'Particularly for names'
+//                 }
+//             ]
+//         }
+//         diagnostics.push(diagnostic)
+//     }
+//     return diagnostics
+// }
 
 connection.onDidChangeWatchedFiles((_change) => {
     // Monitored files have change in VSCode

@@ -82,5 +82,9 @@
                 "path": "./syntaxes/cml.tmLanguage.json"
             }
         ]
+    },
+    "devDependencies": {
+        "@types/jest": "^29.5.12",
+        "typescript": "^5.4.5"
     }
 }
