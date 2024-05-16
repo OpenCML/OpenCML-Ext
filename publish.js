@@ -22,6 +22,7 @@ const currentTime = new Date().toLocaleString('zh-CN', {
 const outputFileName = `OpenCML-Ext-${version}-${currentTime}.${format}`
 const outputPath = path.join(outputFolder, outputFileName)
 
+execSync("npm run compile")
 execSync("vsce package --out " + outputPath)
 
 console.log(`Created ${outputPath}`)

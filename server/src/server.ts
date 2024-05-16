@@ -16,7 +16,9 @@ import {
 } from 'vscode-languageserver/node'
 
 import { TextDocument } from 'vscode-languageserver-textdocument'
-import { exec } from 'child_process'
+import * as util from 'util'
+import * as fs from 'fs'
+import * as child_process from 'child_process'
 
 // Create a connection for the server, using Node's IPC as a transport.
 // Also include all preview / proposed LSP features.
@@ -116,7 +118,7 @@ function getDocumentSettings(resource: string): Thenable<Settings> {
     if (!result) {
         result = connection.workspace.getConfiguration({
             scopeUri: resource,
-            section: 'languageServerExample'
+            section: 'opencmlLanguageServer'
         })
         documentSettings.set(resource, result)
     }
@@ -133,7 +135,7 @@ connection.languages.diagnostics.on(async (params) => {
     if (document !== undefined) {
         return {
             kind: DocumentDiagnosticReportKind.Full,
-            items: await validateTextDocument(document)
+            items: await validateCode(document.getText())
         } satisfies DocumentDiagnosticReport
     } else {
         // We don't know the document. We can either try to read it from disk
@@ -148,87 +150,88 @@ connection.languages.diagnostics.on(async (params) => {
 // The content of a text document has changed. This event is emitted
 // when the text document first opened or when its content has changed.
 documents.onDidChangeContent((change) => {
-    validateTextDocument(change.document)
+    // console.log('onDidChangeContent')
+    // validateCode(change.document.getText())
 })
 
-async function validateTextDocument(textDocument: TextDocument): Promise<Diagnostic[]> {
-    const filePath = textDocument.uri.replace('file://', '') // Remove 'file://' prefix
-
-    return new Promise<Diagnostic[]>((resolve, reject) => {
-        exec(`camel --syntax-only "${filePath}"`, (error, stdout, stderr) => {
-            if (error) {
-                reject(error)
-                return
-            }
-
-            const diagnostics: Diagnostic[] = []
-            const errors = stdout.trim().split('\n')
-
-            for (const error of errors) {
-                const { filename, line, column, message } = JSON.parse(error)
-
-                const diagnostic: Diagnostic = {
-                    severity: DiagnosticSeverity.Error,
-                    range: {
-                        start: { line: line - 1, character: column - 1 },
-                        end: { line: line - 1, character: column - 1 }
-                    },
-                    message,
-                    source: 'camel'
-                }
-
-                diagnostics.push(diagnostic)
-            }
-
-            resolve(diagnostics)
-        })
-    })
+interface ErrorInfo {
+    filename: string
+    line: number
+    column: number
+    message: string
 }
 
-// async function validateTextDocument(textDocument: TextDocument): Promise<Diagnostic[]> {
-//     // In this simple example we get the settings for every validate run.
-//     const settings = await getDocumentSettings(textDocument.uri)
+export async function validateCode(codeText: string) {
+    try {
+        console.log('parsing code:', codeText)
 
-//     // The validator creates diagnostics for all uppercase words length 2 and more
-//     const text = textDocument.getText()
-//     const pattern = /\b[A-Z]{2,}\b/g
-//     let m: RegExpExecArray | null
+        const camelProcess = child_process.spawn('camel', [
+            '--syntax-only',
+            '--error-format',
+            'json'
+        ])
 
-//     let problems = 0
-//     const diagnostics: Diagnostic[] = []
-//     while ((m = pattern.exec(text)) && problems < settings.maxNumberOfProblems) {
-//         problems++
-//         const diagnostic: Diagnostic = {
-//             severity: DiagnosticSeverity.Warning,
-//             range: {
-//                 start: textDocument.positionAt(m.index),
-//                 end: textDocument.positionAt(m.index + m[0].length)
-//             },
-//             message: `${m[0]} is all uppercase.`,
-//             source: 'ex'
-//         }
-//         if (hasDiagnosticRelatedInformationCapability) {
-//             diagnostic.relatedInformation = [
-//                 {
-//                     location: {
-//                         uri: textDocument.uri,
-//                         range: Object.assign({}, diagnostic.range)
-//                     },
-//                     message: 'Spelling matters'
-//                 },
-//                 {
-//                     location: {
-//                         uri: textDocument.uri,
-//                         range: Object.assign({}, diagnostic.range)
-//                     },
-//                     message: 'Particularly for names'
-//                 }
-//             ]
-//         }
-//         diagnostics.push(diagnostic)
-//     }
-//     return diagnostics
-// }
+        const { stdout, stderr } = await new Promise<{ stdout: string; stderr: string }>(
+            (resolve, reject) => {
+                let stdout = ''
+                let stderr = ''
+
+                camelProcess.stdout.on('data', (data) => {
+                    stdout += data.toString()
+                })
+
+                camelProcess.stderr.on('data', (data) => {
+                    stderr += data.toString()
+                })
+
+                camelProcess.on('close', (code) => {
+                    if (code !== 0) {
+                        reject(new Error(`Camel process exited with code ${code}`))
+                    } else {
+                        resolve({ stdout, stderr })
+                    }
+                })
+
+                camelProcess.stdin.write(codeText)
+                camelProcess.stdin.end()
+            }
+        )
+
+        const errors: ErrorInfo[] = []
+
+        for (const line of stdout.split('\n')) {
+            if (line === '') {
+                continue
+            }
+            try {
+                const error = JSON.parse(line)
+                errors.push({
+                    filename: error.filename,
+                    line: error.line,
+                    column: error.column,
+                    message: error.message
+                })
+            } catch (error) {
+                console.error('Error parsing line:', error)
+            }
+        }
+
+        const diagnostics = errors.map((error) => ({
+            severity: DiagnosticSeverity.Error,
+            range: {
+                start: { line: error.line - 1, character: error.column - 1 },
+                end: { line: error.line - 1, character: error.column - 1 }
+            },
+            message: error.message,
+            source: 'OpenCML'
+        }))
+        
+        return diagnostics
+    } catch (error) {
+        console.error(error)
+        throw error
+    }
+}
 
 connection.onDidChangeWatchedFiles((_change) => {
     // Monitored files have change in VSCode
