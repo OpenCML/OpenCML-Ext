@@ -132,14 +132,22 @@ documents.onDidClose((e) => {
 
 connection.languages.diagnostics.on(async (params) => {
     const document = documents.get(params.textDocument.uri)
-    if (document !== undefined) {
-        return {
-            kind: DocumentDiagnosticReportKind.Full,
-            items: await validateCode(document.getText())
-        } satisfies DocumentDiagnosticReport
-    } else {
-        // We don't know the document. We can either try to read it from disk
-        // or we don't report problems for it.
+    try {
+        if (document !== undefined) {
+            return {
+                kind: DocumentDiagnosticReportKind.Full,
+                items: await validateCode(document.getText())
+            } satisfies DocumentDiagnosticReport
+        } else {
+            // We don't know the document. We can either try to read it from disk
+            // or we don't report problems for it.
+            return {
+                kind: DocumentDiagnosticReportKind.Full,
+                items: []
+            } satisfies DocumentDiagnosticReport
+        }
+    } catch (error) {
+        console.error('Error during validation:', error)
         return {
             kind: DocumentDiagnosticReportKind.Full,
             items: []
@@ -163,8 +171,6 @@ interface ErrorInfo {
 
 export async function validateCode(codeText: string) {
     try {
-        console.log('parsing code:', codeText)
-
         const camelProcess = child_process.spawn('camel', [
             '--syntax-only',
             '--error-format',
@@ -216,16 +222,30 @@ export async function validateCode(codeText: string) {
             }
         }
 
-        const diagnostics = errors.map((error) => ({
-            severity: DiagnosticSeverity.Error,
-            range: {
-                start: { line: error.line - 1, character: error.column - 1 },
-                end: { line: error.line - 1, character: error.column - 1 }
-            },
-            message: error.message,
-            source: 'OpenCML'
-        }))
-        
+        const diagnostics = errors.map((error) => {
+            const line = Math.max(0, error.line - 1)
+            const character = Math.max(0, error.column - 1)
+            return {
+                severity: DiagnosticSeverity.Error,
+                range: {
+                    start: { line, character },
+                    end: { line, character }
+                },
+                message: error.message,
+                source: 'OpenCML'
+            }
+        })
+
+        if (diagnostics.length === 0) {
+            console.log('No issues found')
+        } else {
+            console.log(`Found ${diagnostics.length} issue(s)`)
+        }
+
+        for (const diagnostic of diagnostics) {
+            console.log(`Diagnostic: ${util.inspect(diagnostic, { depth: 10 })}`)
+        }
+
         return diagnostics
     } catch (error) {
         console.error(error)
