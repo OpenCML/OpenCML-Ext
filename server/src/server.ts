@@ -96,7 +96,7 @@ connection.onInitialized(() => {
 
 connection.onHover((params: HoverParams): Promise<Hover> => {
     return Promise.resolve({
-        contents: ['Hover Demo']
+        contents: ['OpenCML']
     })
 })
 
@@ -122,16 +122,16 @@ connection.onDocumentFormatting(async (params: DocumentFormattingParams): Promis
 connection.onSignatureHelp((params: SignatureHelpParams): Promise<SignatureHelp> => {
     return Promise.resolve({
         signatures: [
-            {
-                label: 'Signature Demo',
-                documentation: '帮助文档',
-                parameters: [
-                    {
-                        label: '@p1 first param',
-                        documentation: '参数说明'
-                    }
-                ]
-            }
+            // {
+            //     label: 'Signature Demo',
+            //     documentation: '帮助文档',
+            //     parameters: [
+            //         {
+            //             label: '@p1 first param',
+            //             documentation: '参数说明'
+            //         }
+            //     ]
+            // }
         ],
         activeSignature: 0,
         activeParameter: 0

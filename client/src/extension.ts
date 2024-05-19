@@ -11,15 +11,6 @@ let client: LanguageClient
 
 export function activate(context: vscode.ExtensionContext) {
 
-    // vscode.languages.registerDocumentFormattingEditProvider('cml', {
-    //     provideDocumentFormattingEdits(document: vscode.TextDocument): vscode.TextEdit[] {
-    //         const firstLine = document.lineAt(0)
-    //         if (firstLine.text !== '42') {
-    //             return [vscode.TextEdit.insert(firstLine.range.start, '42\n')]
-    //         }
-    //     }
-    // })
-
     // LSP related code
 
     // The server is implemented in node
