@@ -1,7 +1,6 @@
 import {
     createConnection,
     TextDocuments,
-    Diagnostic,
     DiagnosticSeverity,
     ProposedFeatures,
     InitializeParams,
@@ -12,10 +11,17 @@ import {
     TextDocumentSyncKind,
     InitializeResult,
     DocumentDiagnosticReportKind,
-    type DocumentDiagnosticReport
+    type DocumentDiagnosticReport,
+    HoverParams,
+    Hover,
+    DocumentFormattingParams,
+    SignatureHelpParams,
+    SignatureHelp,
+    Range,
+    Position
 } from 'vscode-languageserver/node'
 
-import { TextDocument } from 'vscode-languageserver-textdocument'
+import { TextDocument, TextEdit } from 'vscode-languageserver-textdocument'
 import * as util from 'util'
 import * as fs from 'fs'
 import * as child_process from 'child_process'
@@ -50,6 +56,7 @@ connection.onInitialize((params: InitializeParams) => {
 
     const result: InitializeResult = {
         capabilities: {
+            hoverProvider: true,
             textDocumentSync: TextDocumentSyncKind.Incremental,
             // Tell the client that this server supports code completion.
             completionProvider: {
@@ -58,6 +65,10 @@ connection.onInitialize((params: InitializeParams) => {
             diagnosticProvider: {
                 interFileDependencies: false,
                 workspaceDiagnostics: false
+            },
+            documentFormattingProvider: true,
+            signatureHelpProvider: {
+                triggerCharacters: ['(', '->', '.']
             }
         }
     }
@@ -81,6 +92,50 @@ connection.onInitialized(() => {
             connection.console.log('Workspace folder change event received.')
         })
     }
+})
+
+connection.onHover((params: HoverParams): Promise<Hover> => {
+    return Promise.resolve({
+        contents: ['Hover Demo']
+    })
+})
+
+connection.onDocumentFormatting(async (params: DocumentFormattingParams): Promise<TextEdit[]> => {
+    const { textDocument } = params
+    const doc = documents.get(textDocument.uri)!
+    const text = doc.getText()
+
+    try {
+        const formattedText = await formatCode(text)
+        const fullRange = Range.create(Position.create(0, 0), doc.positionAt(text.length))
+        const edit: TextEdit = {
+            range: fullRange,
+            newText: formattedText
+        }
+        return [edit]
+    } catch (error) {
+        console.error(error)
+        return []
+    }
+})
+
+connection.onSignatureHelp((params: SignatureHelpParams): Promise<SignatureHelp> => {
+    return Promise.resolve({
+        signatures: [
+            {
+                label: 'Signature Demo',
+                documentation: '帮助文档',
+                parameters: [
+                    {
+                        label: '@p1 first param',
+                        documentation: '参数说明'
+                    }
+                ]
+            }
+        ],
+        activeSignature: 0,
+        activeParameter: 0
+    })
 })
 
 // The example settings
@@ -171,7 +226,7 @@ interface ErrorInfo {
 
 export async function validateCode(codeText: string) {
     try {
-        const camelProcess = child_process.spawn('camel', [
+        const camelProcess = child_process.spawn('camel-stable', [
             '--syntax-only',
             '--error-format',
             'json'
@@ -247,6 +302,49 @@ export async function validateCode(codeText: string) {
         }
 
         return diagnostics
+    } catch (error) {
+        console.error(error)
+        throw error
+    }
+}
+
+export async function formatCode(codeText: string) {
+    try {
+        const camelProcess = child_process.spawn('camel-stable', ['--format'])
+
+        const { stdout, stderr } = await new Promise<{ stdout: string; stderr: string }>(
+            (resolve, reject) => {
+                let formattedCode = ''
+                let stderr = ''
+
+                camelProcess.stdout.on('data', (data) => {
+                    formattedCode += data.toString().replace(/\r\n/g, '\n')
+                })
+
+                camelProcess.stderr.on('data', (data) => {
+                    stderr += data.toString()
+                })
+
+                camelProcess.on('close', (code) => {
+                    if (code !== 0) {
+                        reject(new Error(`Camel process exited with code ${code}`))
+                    } else {
+                        resolve({ stdout: formattedCode, stderr })
+                    }
+                })
+
+                camelProcess.stdin.write(codeText)
+                camelProcess.stdin.end()
+            }
+        )
+
+        if (stderr) {
+            throw new Error(stderr)
+        }
+
+        console.log('Formatted code:', stdout)
+
+        return stdout
     } catch (error) {
         console.error(error)
         throw error

@@ -1,6 +1,5 @@
 import * as path from 'path'
-import { workspace, ExtensionContext } from 'vscode'
-
+import * as vscode from 'vscode'
 import {
     LanguageClient,
     LanguageClientOptions,
@@ -10,7 +9,19 @@ import {
 
 let client: LanguageClient
 
-export function activate(context: ExtensionContext) {
+export function activate(context: vscode.ExtensionContext) {
+
+    // vscode.languages.registerDocumentFormattingEditProvider('cml', {
+    //     provideDocumentFormattingEdits(document: vscode.TextDocument): vscode.TextEdit[] {
+    //         const firstLine = document.lineAt(0)
+    //         if (firstLine.text !== '42') {
+    //             return [vscode.TextEdit.insert(firstLine.range.start, '42\n')]
+    //         }
+    //     }
+    // })
+
+    // LSP related code
+
     // The server is implemented in node
     const serverModule = context.asAbsolutePath(path.join('server', 'out', 'server.js'))
 
@@ -29,7 +40,7 @@ export function activate(context: ExtensionContext) {
         // Register the server for plain text documents
         documentSelector: [{ scheme: 'file', language: 'cml' }],
         synchronize: {
-            fileEvents: workspace.createFileSystemWatcher('**/.opencmlrc')
+            fileEvents: vscode.workspace.createFileSystemWatcher('**/.opencmlrc')
         }
     }
 
