@@ -18,12 +18,12 @@ import {
     SignatureHelpParams,
     SignatureHelp,
     Range,
-    Position
+    Position,
+    Diagnostic
 } from 'vscode-languageserver/node'
 
 import { TextDocument, TextEdit } from 'vscode-languageserver-textdocument'
 import * as util from 'util'
-import * as fs from 'fs'
 import * as child_process from 'child_process'
 
 // Create a connection for the server, using Node's IPC as a transport.
@@ -202,7 +202,7 @@ connection.languages.diagnostics.on(async (params) => {
             } satisfies DocumentDiagnosticReport
         }
     } catch (error) {
-        console.error('Error during validation:', error)
+        console.log('Error during validation:', error)
         return {
             kind: DocumentDiagnosticReportKind.Full,
             items: []
@@ -232,6 +232,14 @@ export async function validateCode(codeText: string) {
             'json'
         ])
 
+        camelProcess.on('error', (error) => {
+            console.error('Error starting camel process:', error)
+        })
+
+        if (!camelProcess.pid) {
+            throw new Error('Failed to start camel process, please make sure camel is installed')
+        }
+
         const { stdout, stderr } = await new Promise<{ stdout: string; stderr: string }>(
             (resolve, reject) => {
                 let stdout = ''
@@ -242,7 +250,7 @@ export async function validateCode(codeText: string) {
                 })
 
                 camelProcess.stderr.on('data', (data) => {
-                    stderr += data.toString()
+                    throw new Error(data.toString())
                 })
 
                 camelProcess.on('close', (code) => {
@@ -303,14 +311,22 @@ export async function validateCode(codeText: string) {
 
         return diagnostics
     } catch (error) {
-        console.error(error)
-        throw error
+        console.log('Error validating code:', error)
+        return []
     }
 }
 
 export async function formatCode(codeText: string) {
     try {
         const camelProcess = child_process.spawn('camel-stable', ['--format'])
+
+        camelProcess.on('error', (error) => {
+            console.error('Error starting camel process:', error)
+        })
+
+        if (!camelProcess.pid) {
+            throw new Error('Failed to start camel process, please make sure camel is installed')
+        }
 
         const { stdout, stderr } = await new Promise<{ stdout: string; stderr: string }>(
             (resolve, reject) => {
@@ -346,8 +362,8 @@ export async function formatCode(codeText: string) {
 
         return stdout
     } catch (error) {
-        console.error(error)
-        throw error
+        console.log('Error formatting code:', error)
+        return codeText
     }
 }
 

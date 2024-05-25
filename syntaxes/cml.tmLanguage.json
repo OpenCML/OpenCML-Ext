@@ -178,16 +178,6 @@
 				{
 					"name": "entity.name.type.cml",
 					"match": "(?<=\\bfunc\\b.+->\\s*)[a-zA-Z_]\\w*"
-				},
-				{
-					"name": "markup.italic.cml",
-					"begin": "@",
-					"end": "\\)|}|\\]|\\r?\\n",
-					"patterns": [
-						{
-							"include": "#inners"
-						}
-					]
 				}
 			]
 		},
