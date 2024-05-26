@@ -44,7 +44,7 @@
 				},
 				{
 					"name": "keyword.control.cml",
-					"match": "\\b(type|with|func|this|return|let|use|as|is|if|else|for|while|from)\\b"
+					"match": "\\b(type|with|func|return|let|use|as|is|if|else|for|while|from)\\b"
 				},
 				{
 					"name": "storage.modifier.cml",

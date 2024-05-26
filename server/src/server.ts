@@ -250,7 +250,7 @@ export async function validateCode(codeText: string) {
                 })
 
                 camelProcess.stderr.on('data', (data) => {
-                    throw new Error(data.toString())
+                    stderr += data.toString()
                 })
 
                 camelProcess.on('close', (code) => {
@@ -265,6 +265,9 @@ export async function validateCode(codeText: string) {
                 camelProcess.stdin.end()
             }
         )
+
+        console.log('Validation stdout:', stdout)
+        console.log('Validation stderr:', stderr)
 
         const errors: ErrorInfo[] = []
 
