@@ -189,7 +189,7 @@
 				},
 				{
 					"name": "support.function.io.cml",
-					"match": "\\b(print|load|save|cml|json|xml)\\b"
+					"match": "(?<=(\\.|->))\\b[a-zA-Z_]\\w*|(?<!@)\\b[a-zA-Z_]\\w*(?=<[^>]*>|\\(.*\\))"
 				}
 			]
 		},
