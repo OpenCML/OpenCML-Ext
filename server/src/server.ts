@@ -19,7 +19,6 @@ import {
     SignatureHelp,
     Range,
     Position,
-    Diagnostic
 } from 'vscode-languageserver/node'
 
 import { TextDocument, TextEdit } from 'vscode-languageserver-textdocument'
@@ -92,6 +91,7 @@ connection.onInitialized(() => {
             connection.console.log('Workspace folder change event received.')
         })
     }
+    updateSettings()
 })
 
 connection.onHover((params: HoverParams): Promise<Hover> => {
@@ -140,49 +140,31 @@ connection.onSignatureHelp((params: SignatureHelpParams): Promise<SignatureHelp>
 
 // The example settings
 interface Settings {
-    maxNumberOfProblems: number
+    maxNumberOfProblems: number,
+    camelPath: string
 }
 
 // The global settings, used when the `workspace/configuration` request is not supported by the client.
 // Please note that this is not the case when using this server with the client provided in this example
 // but could happen with other clients.
-const defaultSettings: Settings = { maxNumberOfProblems: 1000 }
+const defaultSettings: Settings = { maxNumberOfProblems: 1000, camelPath: 'camel' }
 let globalSettings: Settings = defaultSettings
 
-// Cache the settings of all open documents
-const documentSettings: Map<string, Thenable<Settings>> = new Map()
+async function updateSettings() {
+    const settings = await connection.workspace.getConfiguration('opencmlLanguageServer')
+    globalSettings = settings as Settings
+}
 
-connection.onDidChangeConfiguration((change) => {
+connection.onDidChangeConfiguration(async () => {
     if (hasConfigurationCapability) {
-        // Reset all cached document settings
-        documentSettings.clear()
-    } else {
-        globalSettings = <Settings>(change.settings.languageServerExample || defaultSettings)
+        // fetch the settings for this client
+        await updateSettings()
+        console.log('Settings updated:', globalSettings)
     }
     // Refresh the diagnostics since the `maxNumberOfProblems` could have changed.
     // We could optimize things here and re-fetch the setting first can compare it
     // to the existing setting, but this is out of scope for this example.
     connection.languages.diagnostics.refresh()
-})
-
-function getDocumentSettings(resource: string): Thenable<Settings> {
-    if (!hasConfigurationCapability) {
-        return Promise.resolve(globalSettings)
-    }
-    let result = documentSettings.get(resource)
-    if (!result) {
-        result = connection.workspace.getConfiguration({
-            scopeUri: resource,
-            section: 'opencmlLanguageServer'
-        })
-        documentSettings.set(resource, result)
-    }
-    return result
-}
-
-// Only keep settings for open documents
-documents.onDidClose((e) => {
-    documentSettings.delete(e.document.uri)
 })
 
 connection.languages.diagnostics.on(async (params) => {
@@ -210,13 +192,6 @@ connection.languages.diagnostics.on(async (params) => {
     }
 })
 
-// The content of a text document has changed. This event is emitted
-// when the text document first opened or when its content has changed.
-documents.onDidChangeContent((change) => {
-    // console.log('onDidChangeContent')
-    // validateCode(change.document.getText())
-})
-
 interface ErrorInfo {
     filename: string
     line: number
@@ -226,7 +201,8 @@ interface ErrorInfo {
 
 export async function validateCode(codeText: string) {
     try {
-        const camelProcess = child_process.spawn('camel', [
+        console.log('using camel path:', globalSettings.camelPath)
+        const camelProcess = child_process.spawn(globalSettings.camelPath, [
             '--syntax-only',
             '--error-format',
             'json'
@@ -321,7 +297,8 @@ export async function validateCode(codeText: string) {
 
 export async function formatCode(codeText: string) {
     try {
-        const camelProcess = child_process.spawn('camel', ['--format'])
+        console.log('using camel path:', globalSettings.camelPath)
+        const camelProcess = child_process.spawn(globalSettings.camelPath, ['--format'])
 
         camelProcess.on('error', (error) => {
             console.error('Error starting camel process:', error)

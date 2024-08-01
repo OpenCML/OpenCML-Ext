@@ -26,8 +26,14 @@
     "contributes": {
         "configuration": {
             "type": "object",
-            "title": "Example configuration",
+            "title": "Camel configuration",
             "properties": {
+                "opencmlLanguageServer.camelPath": {
+                    "scope": "resource",
+                    "type": "string",
+                    "default": "camel",
+                    "description": "Path to the Camel executable."
+                },
                 "opencmlLanguageServer.maxNumberOfProblems": {
                     "scope": "resource",
                     "type": "number",

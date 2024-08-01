@@ -9,7 +9,29 @@ import {
 
 let client: LanguageClient
 
+function getCamelPath(): string | undefined {
+    const config = vscode.workspace.getConfiguration('opencmlLanguageServer');
+    return config.get<string>('camelPath');
+}
+
+// 示例函数，展示如何使用获取到的配置项
+function showCamelPath() {
+    const softwarePath = getCamelPath();
+
+    if (softwarePath) {
+        vscode.window.showInformationMessage(`Camel Path: ${softwarePath}`);
+    } else {
+        vscode.window.showWarningMessage('Camel Path is not set.');
+    }
+}
+
 export function activate(context: vscode.ExtensionContext) {
+    let disposable = vscode.commands.registerCommand('extension.showCamelPath', () => {
+        showCamelPath();
+    });
+
+    context.subscriptions.push(disposable);
+
     // LSP related code
 
     // The server is implemented in node
