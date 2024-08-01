@@ -226,7 +226,7 @@ interface ErrorInfo {
 
 export async function validateCode(codeText: string) {
     try {
-        const camelProcess = child_process.spawn('camel-stable', [
+        const camelProcess = child_process.spawn('camel', [
             '--syntax-only',
             '--error-format',
             'json'
@@ -321,7 +321,7 @@ export async function validateCode(codeText: string) {
 
 export async function formatCode(codeText: string) {
     try {
-        const camelProcess = child_process.spawn('camel-stable', ['--format'])
+        const camelProcess = child_process.spawn('camel', ['--format'])
 
         camelProcess.on('error', (error) => {
             console.error('Error starting camel process:', error)

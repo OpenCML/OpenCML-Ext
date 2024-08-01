@@ -1,0 +1,220 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "PSL",
+	"patterns": [
+		{
+			"include": "#keywords"
+		},
+		{
+			"include": "#strings"
+		},
+		{
+			"include": "#comments"
+		},
+		{
+			"include": "#numerics"
+		},
+		{
+			"include": "#structures"
+		},
+		{
+			"include": "#supports"
+		},
+		{
+			"include": "#identifiers"
+		},
+		{
+			"include": "#punctuations"
+		}
+	],
+	"repository": {
+		"keywords": {
+			"patterns": [
+				{
+					"name": "entity.name.type.numeric.psl",
+					"match": "\\b(Int32|Int64|Float|Double|Int|Real|Number|Bool|Char|String)\\b"
+				},
+				{
+					"name": "entity.name.type.prime.psl",
+					"match": "\\b(Set|Map|List|Dict|Array|Tuple|Union|Vector|Tensor|Any|Void|Functor)\\b"
+				},
+				{
+					"name": "constant.language.psl",
+					"match": "\\b(null|true|false)\\b"
+				},
+				{
+					"name": "keyword.control.psl",
+					"match": "\\b(type|with|func|return|let|use|as|is|if|else|for|while|from)\\b"
+				},
+				{
+					"name": "storage.modifier.psl",
+					"match": "\\b(inner|outer|atomic|static|sync)\\b"
+				}
+			]
+		},
+		"strings": {
+			"patterns": [
+				{
+					"name": "string.quoted.double.psl",
+					"begin": "\"",
+					"end": "\"",
+					"patterns": [
+						{
+							"name": "character.escape.psl",
+							"match": "\\\\."
+						}
+					]
+				},
+				{
+					"name": "string.quoted.single.psl",
+					"begin": "'",
+					"end": "'",
+					"patterns": [
+						{
+							"name": "character.escape.psl",
+							"match": "\\\\."
+						}
+					]
+				},
+				{
+					"name": "string.interpolated.psl",
+					"begin": "`",
+					"end": "`",
+					"patterns": [
+						{
+							"name": "character.escape.psl",
+							"match": "\\\\."
+						}
+					]
+				},
+				{
+					"name": "string.quoted.triple.psl",
+					"begin": "\"\"\"",
+					"end": "\"\"\""
+				},
+				{
+					"name": "string.quoted.triple.psl",
+					"begin": "'''",
+					"end": "'''"
+				},
+				{
+					"name": "string.quoted.triple.psl",
+					"begin": "```",
+					"end": "```"
+				}
+			]
+		},
+		"comments": {
+			"patterns": [
+				{
+					"name": "comment.line.double-slash.psl",
+					"match": "//.*$"
+				},
+				{
+					"name": "comment.line.number-sign.psl",
+					"match": "# .*$"
+				},
+				{
+					"name": "comment.block.documentation.psl",
+					"begin": "/\\*",
+					"end": "\\*/"
+				}
+			]
+		},
+		"numerics": {
+			"patterns": [
+				{
+					"name": "constant.numeric.real.psl",
+					"match": "(\\-|\\+)?[\\d]+\\.[\\d]+(e(\\-|\\+)?[\\d]+)?"
+				},
+				{
+					"name": "constant.numeric.integer.psl",
+					"match": "(\\-|\\+)?[\\d]+(e(\\-|\\+)?[\\d]+)?"
+				},
+				{
+					"name": "constant.numeric.complex.psl",
+					"match": "(\\-|\\+)?[\\d]+\\.[\\d]+(e(\\-|\\+)?[\\d]+)?(\\-|\\+)[\\d]+\\.[\\d]+(e(\\-|\\+)?[\\d]+)?i"
+				},
+				{
+					"name": "constant.numeric.complex.psl",
+					"match": "(\\-|\\+)?[\\d]+(e(\\-|\\+)?[\\d]+)?(\\-|\\+)[\\d]+(e(\\-|\\+)?[\\d]+)?i"
+				}
+			]
+		},
+		"identifiers": {
+			"patterns": [
+				{
+					"name": "variable.psl",
+					"match": "\\b[a-zA-Z_]\\w*\\b"
+				}
+			]
+		},
+		"punctuations": {
+			"patterns": [
+				{
+					"name": "variable.parameter.separator.psl",
+					"match": "[\\(\\)\\{\\}\\[\\]<>;,=:@]"
+				},
+				{
+					"name": "variable.parameter.operator.psl",
+					"match": "->|:=|\\.|=>|\\+|\\-|\\*|/|\\^|%|\\||&|\\||<<|>>|>=|<=|==|!=|\\*=|/=|%=|\\+=|-="
+				}
+			]
+		},
+		"structures": {
+			"patterns": [
+				{
+					"name": "entity.name.function.psl",
+					"match": "(?<=\\bfunc\\b\\s+)[a-zA-Z_]\\w*"
+				},
+				{
+					"name": "entity.name.type.psl",
+					"match": "(?<=\\btype\\b\\s+)[a-zA-Z_]\\w*"
+				},
+				{
+					"name": "entity.name.type.psl",
+					"match": "(?<=:\\s*)[a-zA-Z_]\\w*"
+				},
+				{
+					"name": "entity.name.type.psl",
+					"match": "(?<=\\bfunc\\b.+->\\s*)[a-zA-Z_]\\w*"
+				}
+			]
+		},
+		"supports": {
+			"patterns": [
+				{
+					"name": "support.type.psl",
+					"match": "\\b(module)\\b"
+				},
+				{
+					"name": "support.function.io.psl",
+					"match": "(?<=(\\.|->))\\b[a-zA-Z_]\\w*|(?<!@)\\b[a-zA-Z_]\\w*(?=<[^>]*>|\\(.*\\))"
+				}
+			]
+		},
+		"inners": {
+			"patterns": [
+				{
+					"include": "#keywords"
+				},
+				{
+					"include": "#strings"
+				},
+				{
+					"include": "#numerics"
+				},
+				{
+					"include": "#supports"
+				},
+				{
+					"include": "#identifiers"
+				},
+				{
+					"include": "#punctuations"
+				}
+			]
+		}
+	},
+	"scopeName": "source.psl"
+}

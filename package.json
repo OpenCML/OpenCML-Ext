@@ -2,7 +2,7 @@
     "name": "open-cml-extension",
     "displayName": "OpenCML-Ext",
     "description": "OpenCML Extension for VSCode",
-    "version": "0.2.2",
+    "version": "0.3.0",
     "publisher": "Kogler7",
     "icon": "assets/icon.jpg",
     "type": "module",
@@ -21,6 +21,7 @@
         "type": "git",
         "url": "https://github.com/Kogler7/OpenCML-Ext.git"
     },
+    "activationEvents": [],
     "main": "./client/out/extension",
     "contributes": {
         "configuration": {
@@ -79,7 +80,7 @@
             {
                 "language": "psl",
                 "scopeName": "source.psl",
-                "path": "./syntaxes/cml.tmLanguage.json"
+                "path": "./syntaxes/psl.tmLanguage.json"
             }
         ]
     },

@@ -10,7 +10,6 @@ import {
 let client: LanguageClient
 
 export function activate(context: vscode.ExtensionContext) {
-
     // LSP related code
 
     // The server is implemented in node
@@ -29,7 +28,10 @@ export function activate(context: vscode.ExtensionContext) {
     // Options to control the language client
     const clientOptions: LanguageClientOptions = {
         // Register the server for plain text documents
-        documentSelector: [{ scheme: 'file', language: 'cml' }],
+        documentSelector: [
+            { scheme: 'file', language: 'cml' },
+            { scheme: 'file', language: 'psl' }
+        ],
         synchronize: {
             fileEvents: vscode.workspace.createFileSystemWatcher('**/.opencmlrc')
         }
