@@ -44,11 +44,11 @@
 				},
 				{
 					"name": "keyword.control.psl",
-					"match": "\\b(type|with|func|return|let|use|as|is|if|else|for|while|from)\\b"
+					"match": "\\b(type|wait|from|with|func|return|let|var|use|as|is)\\b"
 				},
 				{
 					"name": "storage.modifier.psl",
-					"match": "\\b(inner|outer|atomic|static|sync)\\b"
+					"match": "\\b(inner|outer|atomic|static)\\b"
 				}
 			]
 		},
