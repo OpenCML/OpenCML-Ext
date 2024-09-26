@@ -48,7 +48,7 @@
 				},
 				{
 					"name": "storage.modifier.cml",
-					"match": "\\b(inner|outer|atomic|static)\\b"
+					"match": "\\b(inner|outer|atomic|static|sync)\\b"
 				}
 			]
 		},
