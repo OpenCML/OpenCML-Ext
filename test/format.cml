@@ -32,14 +32,14 @@ let Power = {
 let var2 = b->(a.at(b))<>()[1]()@{}() [c,];
 let var3 = c->a.b->d e;
 
-inner sync static func load(path: string) : Any
+inner sync shared func load(path: string) : Any
 {
     # inner func
 };
 
 
 # 函子定义，修饰符顺序
-sync static func if(condition: Bool) {
+sync shared func if(condition: Bool) {
 
     # block
 
