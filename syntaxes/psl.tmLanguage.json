@@ -153,7 +153,7 @@
 			"patterns": [
 				{
 					"name": "variable.parameter.separator.psl",
-					"match": "[\\(\\)\\{\\}\\[\\]<>;,=:@]"
+					"match": "[\\?|\\(\\)\\{\\}\\[\\]<>;,=:@]"
 				},
 				{
 					"name": "variable.parameter.operator.psl",
@@ -177,7 +177,7 @@
 				},
 				{
 					"name": "entity.name.type.psl",
-					"match": "(?<=\\bfunc\\b.+->\\s*)[a-zA-Z_]\\w*"
+					"match": "\\((?:[^()]+)\\)\\s*=>\\s*([^\\s]+)"
 				}
 			]
 		},
