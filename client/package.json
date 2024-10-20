@@ -13,6 +13,7 @@
 		"vscode": "^1.80.0"
 	},
 	"dependencies": {
+		"lsp-sample-client": "file:",
 		"vscode-languageclient": "^9.0.1"
 	},
 	"devDependencies": {

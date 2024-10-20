@@ -10,27 +10,121 @@ import {
 let client: LanguageClient
 
 function getCamelPath(): string | undefined {
-    const config = vscode.workspace.getConfiguration('opencmlLanguageServer');
-    return config.get<string>('camelPath');
+    const config = vscode.workspace.getConfiguration('opencmlLanguageServer')
+    return config.get<string>('camelPath')
 }
 
 // 示例函数，展示如何使用获取到的配置项
 function showCamelPath() {
-    const softwarePath = getCamelPath();
+    const softwarePath = getCamelPath()
 
     if (softwarePath) {
-        vscode.window.showInformationMessage(`Camel Path: ${softwarePath}`);
+        vscode.window.showInformationMessage(`Camel Path: ${softwarePath}`)
     } else {
-        vscode.window.showWarningMessage('Camel Path is not set.');
+        vscode.window.showWarningMessage('Camel Path is not set.')
     }
 }
 
-export function activate(context: vscode.ExtensionContext) {
-    let disposable = vscode.commands.registerCommand('extension.showCamelPath', () => {
-        showCamelPath();
-    });
+function getWebviewContent() {
+    return `<!DOCTYPE html>
+	<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>Cat Coding</title>
+	</head>
+	<body>
+		<img src="https://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif" width="300" />
+		<h1 id="lines-of-code-counter">0</h1>
+	
+		<script>
+			const counter = document.getElementById('lines-of-code-counter');
+	
+			let count = 0;
+			setInterval(() => {
+				counter.textContent = count++;
+			}, 100);
+	
+			// Handle the message inside the webview
+			window.addEventListener('message', event => {
+	
+				const message = event.data; // The JSON data our extension sent
+	
+				switch (message.command) {
+					case 'refactor':
+						count = Math.ceil(count * 0.5);
+						counter.textContent = count;
+						break;
+				}
+			});
+		</script>
+	</body>
+	</html>`
+}
 
-    context.subscriptions.push(disposable);
+export function activate(context: vscode.ExtensionContext) {
+    let currPanel: vscode.WebviewPanel | undefined = undefined
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('camel.showPath', () => {
+            showCamelPath()
+        })
+    )
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('camel.run', () => {
+            vscode.window.showInformationMessage('Running code...')
+        })
+    )
+
+    context.subscriptions.push(
+        vscode.commands.registerCommand('camel.vizGIR', () => {
+            const columnToShowIn = vscode.window.activeTextEditor
+                ? vscode.window.activeTextEditor.viewColumn
+                : undefined
+
+            if (currPanel) {
+                currPanel.reveal(columnToShowIn)
+            } else {
+                currPanel = vscode.window.createWebviewPanel(
+                    'camel', // Identifies the type of the webview. Used internally
+                    'GraphIR', // Title of the panel displayed to the user
+                    vscode.ViewColumn.Beside,
+                    {
+                        enableScripts: true,
+                        retainContextWhenHidden: true
+                    }
+                )
+
+                const onDiskPath = vscode.Uri.joinPath(context.extensionUri, 'media', 'cat.gif')
+                const catGifSrc = currPanel.webview.asWebviewUri(onDiskPath)
+
+                currPanel.webview.postMessage({ command: 'refactor' })
+
+                currPanel.webview.html = getWebviewContent()
+
+                currPanel.webview.onDidReceiveMessage(
+                    (message) => {
+                        switch (message.command) {
+                            case 'alert':
+                                vscode.window.showErrorMessage(message.text)
+                                return
+                        }
+                    },
+                    undefined,
+                    context.subscriptions
+                )
+
+                currPanel.onDidDispose(
+                    () => {
+                        currPanel = undefined
+                    },
+                    null,
+                    context.subscriptions
+                )
+            }
+        })
+    )
 
     // LSP related code
 
