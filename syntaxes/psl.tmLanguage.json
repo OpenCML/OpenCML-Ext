@@ -36,7 +36,7 @@
 				},
 				{
 					"name": "entity.name.type.prime.psl",
-					"match": "\\b(Set|Map|List|Dict|Array|Tuple|Union|Vector|Tensor|Any|Void|Functor)\\b"
+					"match": "\\b(Any|Void)\\b"
 				},
 				{
 					"name": "constant.language.psl",
@@ -44,11 +44,11 @@
 				},
 				{
 					"name": "keyword.control.psl",
-					"match": "\\b(type|wait|from|with|func|return|let|var|use|as|is)\\b"
+					"match": "\\b(as|is|let|var|use|from|func|type|enum|with|wait|return|module|import|export|typeas|typeof|if|then|else|match|case|for|in)\\b"
 				},
 				{
 					"name": "storage.modifier.psl",
-					"match": "\\b(inner|outer|atomic|shared|sync)\\b"
+					"match": "\\b(sync|macro|inner|outer|atomic|shared)\\b"
 				}
 			]
 		},
@@ -69,17 +69,6 @@
 					"name": "string.quoted.single.psl",
 					"begin": "'",
 					"end": "'",
-					"patterns": [
-						{
-							"name": "character.escape.psl",
-							"match": "\\\\."
-						}
-					]
-				},
-				{
-					"name": "string.interpolated.psl",
-					"begin": "`",
-					"end": "`",
 					"patterns": [
 						{
 							"name": "character.escape.psl",
@@ -133,11 +122,11 @@
 				},
 				{
 					"name": "constant.numeric.complex.psl",
-					"match": "(\\-|\\+)?[\\d]+\\.[\\d]+(e(\\-|\\+)?[\\d]+)?(\\-|\\+)[\\d]+\\.[\\d]+(e(\\-|\\+)?[\\d]+)?i"
+					"match": "`(\\-|\\+)?[\\d]+\\.[\\d]+(e(\\-|\\+)?[\\d]+)?(\\-|\\+)[\\d]+\\.[\\d]+(e(\\-|\\+)?[\\d]+)?i`"
 				},
 				{
 					"name": "constant.numeric.complex.psl",
-					"match": "(\\-|\\+)?[\\d]+(e(\\-|\\+)?[\\d]+)?(\\-|\\+)[\\d]+(e(\\-|\\+)?[\\d]+)?i"
+					"match": "`(\\-|\\+)?[\\d]+(e(\\-|\\+)?[\\d]+)?(\\-|\\+)[\\d]+(e(\\-|\\+)?[\\d]+)?i`"
 				}
 			]
 		},
@@ -157,7 +146,7 @@
 				},
 				{
 					"name": "variable.parameter.operator.psl",
-					"match": "->|:=|\\.|=>|\\+|\\-|\\*|/|\\^|%|\\||&|\\||<<|>>|>=|<=|==|!=|\\*=|/=|%=|\\+=|-="
+					"match": "\\.\\.\\.|\\.|\\.\\.|->|\\?.|\\?..|\\?->|=>|\\+|\\-|\\*|/|\\^|%|\\||&|\\||\\|\\||&&|>=|<=|==|!=|===|!==|\\*=|/=|%=|\\+=|-="
 				}
 			]
 		},
@@ -173,7 +162,19 @@
 				},
 				{
 					"name": "entity.name.type.psl",
-					"match": "(?<=:\\s*)[a-zA-Z_]\\w*"
+					"match": "(?<=\\benum\\b\\s+)[a-zA-Z_]\\w*"
+				},
+				{
+					"name": "entity.name.type.psl",
+					"match": "(?<=:\\s*)(?<!::\\s*)([a-zA-Z_])(?![:\\]])\\w*"
+				},
+				{
+					"name": "entity.name.type.psl",
+					"match": "(?<=as\\s*)[a-zA-Z_]\\w*"
+				},
+				{
+					"name": "entity.name.type.psl",
+					"match": "(?<=typeas\\s*)[a-zA-Z_]\\w*"
 				},
 				{
 					"name": "entity.name.type.psl",
@@ -184,12 +185,12 @@
 		"supports": {
 			"patterns": [
 				{
-					"name": "support.type.psl",
-					"match": "\\b(module)\\b"
+					"name": "support.function.io.psl",
+					"match": "(?<=(\\.|\\.\\.|->)([a-zA-Z_]\\w*::)*)\\b[a-zA-Z_]\\w*\\b(?!::)|(?<!@)\\b[a-zA-Z_]\\w*(?=<[^>]*>|\\(.*\\))"
 				},
 				{
 					"name": "support.function.io.psl",
-					"match": "(?<=(\\.|->))\\b[a-zA-Z_]\\w*|(?<!@)\\b[a-zA-Z_]\\w*(?=<[^>]*>|\\(.*\\))"
+					"match": "([a-zA-Z_]\\w*)(?=\\.\\.)"
 				}
 			]
 		},

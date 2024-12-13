@@ -36,7 +36,7 @@
 				},
 				{
 					"name": "entity.name.type.prime.cml",
-					"match": "\\b(Set|Map|List|Dict|Array|Tuple|Union|Vector|Tensor|Any|Void|Functor)\\b"
+					"match": "\\b(Any|Void)\\b"
 				},
 				{
 					"name": "constant.language.cml",
@@ -44,11 +44,11 @@
 				},
 				{
 					"name": "keyword.control.cml",
-					"match": "\\b(type|wait|from|with|func|return|let|var|use|as|is)\\b"
+					"match": "\\b(as|is|let|var|use|from|func|type|enum|with|wait|return|module|import|export|typeas|typeof|if|then|else|match|case|for|in)\\b"
 				},
 				{
 					"name": "storage.modifier.cml",
-					"match": "\\b(inner|outer|atomic|shared|sync)\\b"
+					"match": "\\b(sync|macro|inner|outer|atomic|shared)\\b"
 				}
 			]
 		},
@@ -69,17 +69,6 @@
 					"name": "string.quoted.single.cml",
 					"begin": "'",
 					"end": "'",
-					"patterns": [
-						{
-							"name": "character.escape.cml",
-							"match": "\\\\."
-						}
-					]
-				},
-				{
-					"name": "string.interpolated.cml",
-					"begin": "`",
-					"end": "`",
 					"patterns": [
 						{
 							"name": "character.escape.cml",
@@ -133,11 +122,11 @@
 				},
 				{
 					"name": "constant.numeric.complex.cml",
-					"match": "(\\-|\\+)?[\\d]+\\.[\\d]+(e(\\-|\\+)?[\\d]+)?(\\-|\\+)[\\d]+\\.[\\d]+(e(\\-|\\+)?[\\d]+)?i"
+					"match": "`(\\-|\\+)?[\\d]+\\.[\\d]+(e(\\-|\\+)?[\\d]+)?(\\-|\\+)[\\d]+\\.[\\d]+(e(\\-|\\+)?[\\d]+)?i`"
 				},
 				{
 					"name": "constant.numeric.complex.cml",
-					"match": "(\\-|\\+)?[\\d]+(e(\\-|\\+)?[\\d]+)?(\\-|\\+)[\\d]+(e(\\-|\\+)?[\\d]+)?i"
+					"match": "`(\\-|\\+)?[\\d]+(e(\\-|\\+)?[\\d]+)?(\\-|\\+)[\\d]+(e(\\-|\\+)?[\\d]+)?i`"
 				}
 			]
 		},
@@ -157,7 +146,7 @@
 				},
 				{
 					"name": "variable.parameter.operator.cml",
-					"match": "->|:=|\\.|=>|\\+|\\-|\\*|/|\\^|%|\\||&|\\||<<|>>|>=|<=|==|!=|\\*=|/=|%=|\\+=|-="
+					"match": "\\.\\.\\.|\\.|\\.\\.|->|\\?.|\\?..|\\?->|=>|\\+|\\-|\\*|/|\\^|%|\\||&|\\||\\|\\||&&|>=|<=|==|!=|===|!==|\\*=|/=|%=|\\+=|-="
 				}
 			]
 		},
@@ -173,7 +162,19 @@
 				},
 				{
 					"name": "entity.name.type.cml",
-					"match": "(?<=:\\s*)[a-zA-Z_]\\w*"
+					"match": "(?<=\\benum\\b\\s+)[a-zA-Z_]\\w*"
+				},
+				{
+					"name": "entity.name.type.cml",
+					"match": "(?<=:\\s*)(?<!::\\s*)([a-zA-Z_])(?![:\\]])\\w*"
+				},
+				{
+					"name": "entity.name.type.cml",
+					"match": "(?<=as\\s*)[a-zA-Z_]\\w*"
+				},
+				{
+					"name": "entity.name.type.cml",
+					"match": "(?<=typeas\\s*)[a-zA-Z_]\\w*"
 				},
 				{
 					"name": "entity.name.type.cml",
@@ -184,12 +185,12 @@
 		"supports": {
 			"patterns": [
 				{
-					"name": "support.type.cml",
-					"match": "\\b(module)\\b"
+					"name": "support.function.io.cml",
+					"match": "(?<=(\\.|\\.\\.|->)([a-zA-Z_]\\w*::)*)\\b[a-zA-Z_]\\w*\\b(?!::)|(?<!@)\\b[a-zA-Z_]\\w*(?=<[^>]*>|\\(.*\\))"
 				},
 				{
 					"name": "support.function.io.cml",
-					"match": "(?<=(\\.|->))\\b[a-zA-Z_]\\w*|(?<!@)\\b[a-zA-Z_]\\w*(?=<[^>]*>|\\(.*\\))"
+					"match": "([a-zA-Z_]\\w*)(?=\\.\\.)"
 				}
 			]
 		},

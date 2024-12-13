@@ -25,6 +25,16 @@ function showCamelPath() {
     }
 }
 
+function addWordToSpellChecker(word: string) {
+    const config = vscode.workspace.getConfiguration()
+    const cSpellWords = (config.get('cSpell.words') as string[]) || []
+
+    if (!cSpellWords.includes(word)) {
+        cSpellWords.push(word)
+        config.update('cSpell.words', cSpellWords, vscode.ConfigurationTarget.Global)
+    }
+}
+
 function getWebviewContent() {
     return `<!DOCTYPE html>
 	<html lang="en">
@@ -64,6 +74,8 @@ function getWebviewContent() {
 
 export function activate(context: vscode.ExtensionContext) {
     let currPanel: vscode.WebviewPanel | undefined = undefined
+
+	addWordToSpellChecker('typeas')
 
     context.subscriptions.push(
         vscode.commands.registerCommand('camel.showPath', () => {
