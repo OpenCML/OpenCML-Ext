@@ -25,14 +25,17 @@ function showCamelPath() {
     }
 }
 
-function addWordToSpellChecker(word: string) {
+function addWordToSpellChecker(words: string[]) {
     const config = vscode.workspace.getConfiguration()
     const cSpellWords = (config.get('cSpell.words') as string[]) || []
+	console.log(cSpellWords)
 
-    if (!cSpellWords.includes(word)) {
-        cSpellWords.push(word)
-        config.update('cSpell.words', cSpellWords, vscode.ConfigurationTarget.Global)
-    }
+    words.forEach((word) => {
+        if (!cSpellWords.includes(word)) {
+            cSpellWords.push(word)
+        }
+    })
+    config.update('cSpell.words', cSpellWords, vscode.ConfigurationTarget.Workspace)
 }
 
 function getWebviewContent() {
@@ -75,7 +78,7 @@ function getWebviewContent() {
 export function activate(context: vscode.ExtensionContext) {
     let currPanel: vscode.WebviewPanel | undefined = undefined
 
-	addWordToSpellChecker('typeas')
+    addWordToSpellChecker(['opencml', 'opencmlrc', 'typeas'])
 
     context.subscriptions.push(
         vscode.commands.registerCommand('camel.showPath', () => {

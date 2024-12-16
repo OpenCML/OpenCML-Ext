@@ -1,0 +1,7 @@
+**/*.ts
+test/
+**/tsconfig.json
+!file.ts
+**/package-lock.json
+rollup/
+.vscode/
