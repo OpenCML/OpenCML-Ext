@@ -44,7 +44,7 @@
                 },
                 {
                     "name": "keyword.control.psl",
-                    "match": "\\b(as|is|let|var|use|from|func|type|enum|with|wait|return|module|import|export|typeas|typeof|if|then|else|match|case|for|in)\\b"
+                    "match": "\\b(as|is|of|let|var|use|from|func|type|enum|with|wait|try|catch|finally|throw|raise|return|module|import|export|typeas|typeof|if|then|else|match|case|for|in)\\b"
                 },
                 {
                     "name": "storage.modifier.psl",
@@ -209,11 +209,15 @@
             "patterns": [
                 {
                     "name": "support.function.io.psl",
-                    "match": "(?<=(\\.|\\.\\.|->)([a-zA-Z_]\\w*::)*)\\b[a-zA-Z_]\\w*\\b(?!::)|(?<!@)\\b[a-zA-Z_]\\w*(?=<[^>]*>|\\(.*\\))"
+                    "match": "(?<=[\\w>)\\]](\\.|\\.\\.|->)(\\w+::)*)\\b[a-zA-Z_]\\w*\\b(?!::)"
                 },
                 {
                     "name": "support.function.io.psl",
                     "match": "([a-zA-Z_]\\w*)(?=\\.\\.)"
+                },
+                {
+                    "name": "support.function.io.psl",
+                    "match": "(?<!@)\\b[a-zA-Z_]\\w*(?=<[^>]*>|\\(.*\\))"
                 }
             ]
         },

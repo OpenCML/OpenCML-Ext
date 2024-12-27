@@ -31,7 +31,14 @@ export sync func haha(b:typeas T) sync {
     sync {
         a->uu::baba->b..c::c
     }
+	raise b
+}
+
+try {
+	a
+} catch {
+	b
 }
 
 a..b
-a->b
+a->b1->b2
