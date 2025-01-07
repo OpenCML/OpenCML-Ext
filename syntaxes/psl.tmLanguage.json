@@ -32,11 +32,11 @@
             "patterns": [
                 {
                     "name": "entity.name.type.numeric.psl",
-                    "match": "\\b(Int32|Int64|Float|Double|Int|Real|Number|Bool|Char|String)\\b"
+                    "match": "\\b(int|i32|i64|float|f32|f64|string|bool|char)\\b"
                 },
                 {
                     "name": "entity.name.type.prime.psl",
-                    "match": "\\b(Any|Void)\\b"
+                    "match": "\\b(any|void|functor)\\b"
                 },
                 {
                     "name": "constant.language.psl",
