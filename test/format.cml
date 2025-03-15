@@ -73,11 +73,11 @@ sync func test(target: Functor) {
     return ifexpr(condition<capture>(), 
     { // comment
         exec<
-        {
+        { 
             update<capture>(); // comment
             test<capture, condition, update>(target)
         }>(target);
-    }, null)
+    }, null) 
 };
 
 # 单语句匿名函子/单双引号测试

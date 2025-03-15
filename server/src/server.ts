@@ -221,7 +221,8 @@ interface ErrorInfo {
 
 export async function validateCode(codeText: string, filePath: string) {
     try {
-        const sanitizedPath = filePath.replace(/'/g, "\\'"); // 转义单引号
+        const sanitizedPath = `"${filePath.replace(/"/g, '\\"')}"`;
+
         console.log('using camel path:', globalSettings.camelPath)
         console.log('checking file', filePath)
         const camelProcess = child_process.spawn(globalSettings.camelPath, [
@@ -231,7 +232,9 @@ export async function validateCode(codeText: string, filePath: string) {
             'json',
             sanitizedPath
         ], {
-            cwd: path.dirname(filePath)
+            cwd: path.dirname(filePath),
+            shell: true, // Required for Windows path resolution
+            windowsVerbatimArguments: false // Allows automatic quoting
         })
 
         camelProcess.on('error', (error) => {
@@ -256,6 +259,10 @@ export async function validateCode(codeText: string, filePath: string) {
                 })
 
                 camelProcess.on('close', (code) => {
+
+                    console.log(`[DEBUG] Exit code: ${code}`);
+                    console.log('[DEBUG] stderr output:', stderr);
+
                     if (code !== 0) {
                         reject(new Error(`Camel process exited with code ${code}`))
                     } else {
@@ -271,22 +278,35 @@ export async function validateCode(codeText: string, filePath: string) {
         console.log('Validation stdout:', stdout)
         console.log('Validation stderr:', stderr)
 
-        const errors: ErrorInfo[] = []
 
-        for (const line of stdout.split('\n')) {
+        const errors: ErrorInfo[] = []
+        const lines = stdout.split('\n')
+        for (const line of lines) {
             if (line.trim() === '' || !line.startsWith('{')) {
                 continue
             }
+            const trimmedLine = line.trim()
+            console.log('Parsing line:', trimmedLine)
             try {
-                const error = JSON.parse(line)
-                errors.push({
-                    filename: error.filename,
-                    line: error.line,
-                    column: error.column,
-                    message: error.message
+                const sanitizedLine = trimmedLine.replace(/\\/g, '\\\\')
+                const parsedLine = JSON.parse( sanitizedLine )
+                if (
+                    typeof parsedLine.line === 'number' &&
+                    typeof parsedLine.message === 'string'
+
+                ) {
+                    errors.push({
+                        filename: parsedLine.filename || filePath,
+                        line: parsedLine.line,
+                        column: Math.max(parsedLine.column || 1, 1), // the minimum value is 1
+                        message: parsedLine.message.replace(/\s+/g, ' ') // remove all whitespace
+                    })
+                }
+            } catch (parseError) {
+                console.error('Error parsing line:', {
+                    line: trimmedLine,
+                    error: parseError
                 })
-            } catch (error) {
-                console.error('Error parsing line:', error)
             }
         }
 
