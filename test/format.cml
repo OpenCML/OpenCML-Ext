@@ -8,11 +8,12 @@
 Impact of System Noise and Nonlinearities on a 16-QAM Signal in a Radio-over-Fiber Transmission
 1
 2
+
 ''';
 
 '''
 The relative constellation ...
-'''
+''' 
 @{x: 2, y: 3, 
 style: "alert-info"};
 
@@ -72,11 +73,11 @@ sync func test(target: Functor) {
     return ifexpr(condition<capture>(), 
     { // comment
         exec<
-        {
+        { 
             update<capture>(); // comment
             test<capture, condition, update>(target)
         }>(target);
-    }, null)
+    }, null) 
 };
 
 # 单语句匿名函子/单双引号测试
