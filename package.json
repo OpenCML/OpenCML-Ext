@@ -2,7 +2,7 @@
     "name": "open-cml-extension",
     "displayName": "OpenCML-Ext",
     "description": "OpenCML Extension for VSCode",
-    "version": "0.5.0",
+    "version": "0.6.0",
     "publisher": "Kogler7",
     "icon": "assets/icon.jpg",
     "type": "module",

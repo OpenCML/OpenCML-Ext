@@ -352,7 +352,7 @@ export async function formatCode(codeText: string, filePath: string) {
         })
 
         if (!camelProcess.pid) {
-            throw new Error('Failed to start camel process, please make sure camel is installed')
+            console.error('Failed to start camel process, please make sure camel is installed')
             return codeText
         }
 
@@ -360,59 +360,34 @@ export async function formatCode(codeText: string, filePath: string) {
             (resolve, reject) => {
                 let formattedCode = ''
                 let stderr = ''
-                let hasError = false
-                let resolved = false
 
-                const onData = (data: Buffer) => {
-                    const text = data.toString()
-                    if (text.includes('error') || text.includes('mismatched')) {
-                        console.error('Formatting output contains errors:', text)
-                        hasError = true
-                        if (!resolved) {
-                            resolved = true
-                            camelProcess.stdout.off('data', onData)
-                            camelProcess.stderr.off('data', onStderr)
-                            resolve({ stdout: codeText, stderr: text })
-                        }
-                    } else {
-                        formattedCode += text.replace(/\r\n/g, '\n')
-                    }
-                }
-
-                const onStderr = (data: Buffer) => {
-                    const text = data.toString()
-                    stderr += text
-                    if (!resolved) {
-                        resolved = true
-                        camelProcess.stdout.off('data', onData)
-                        camelProcess.stderr.off('data', onStderr)
-                        resolve({ stdout: codeText, stderr: text })
-                    }
-                }
-
-                camelProcess.stdout.on('data', onData)
-                camelProcess.stderr.on('data', onStderr)
+                camelProcess.stdout.on('data', (data: Buffer) => {
+					formattedCode += data.toString().replace(/\r\n/g, '\n')
+                })
+                camelProcess.stderr.on('data', (data: Buffer) => {
+                    stderr += data.toString()
+                })
 
                 camelProcess.on('close', (code) => {
-                    if (!resolved) {
-                        if (code !== 0 || hasError) {
-                            console.error('Formatting error:', stderr)
-                            console.error('Error output:', stderr)
-                            resolve({ stdout: codeText, stderr })
-                        } else {
-                            resolve({ stdout: formattedCode, stderr })
-                        }
-                    }
+					console.log(`[DEBUG] Exit code: ${code}`)
+					console.log('[DEBUG] stderr output:', stderr)
+					console.log('[DEBUG] stdout output:', formattedCode)
+					if (code !== 0) {
+						reject(new Error(`Camel process exited with code ${code}, stderr: ${stderr}`))
+					} else {
+						resolve({ stdout: formattedCode, stderr })
+					}
                 })
 
                 camelProcess.stdin.write(codeText)
                 camelProcess.stdin.end()
             }
         )
-        if (stdout.includes('error') || stdout.includes('mismatched')) {
-            console.error('Formatting output contains errors:', stdout)
-            return codeText
-        }
+		
+		if (stderr.trim() !== '') {
+			throw new Error(`Camel process exited with stderr: ${stderr}`)
+		}
+
         console.log('Formatted code:', stdout)
         return stdout
     } catch (error) {
