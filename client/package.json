@@ -1,24 +1,27 @@
 {
-	"name": "lsp-sample-client",
-	"description": "VSCode part of a language server",
-	"author": "Microsoft Corporation",
-	"license": "MIT",
-	"version": "0.0.1",
-	"publisher": "vscode",
-	"repository": {
-		"type": "git",
-		"url": "https://github.com/Microsoft/vscode-extension-samples"
-	},
-	"engines": {
-		"vscode": "^1.80.0"
-	},
-	"dependencies": {
-		"lsp-sample-client": "file:",
-		"vscode-languageclient": "^9.0.1"
-	},
-	"devDependencies": {
-		"@types/node": "^20.12.11",
-		"@types/vscode": "^1.75.1",
-		"@vscode/test-electron": "^2.3.9"
-	}
+    "name": "client",
+    "description": "VSCode extension for OpenCML",
+    "displayName": "OpenCML Extension",
+    "author": "The OpenCML Organization",
+    "license": "MIT",
+    "version": "0.0.1",
+    "type": "module",
+    "scripts": {
+        "build": "vite build"
+    },
+    "engines": {
+        "vscode": "^1.80.0"
+    },
+    "dependencies": {
+        "vscode-languageclient": "^9.0.1"
+    },
+    "devDependencies": {
+        "@types/node": "^24.1.0",
+        "@types/vscode": "^1.102.0",
+        "@vscode/test-electron": "^2.5.2",
+        "postinstall-postinstall": "^2.1.0",
+        "vite": "^7.0.6",
+        "typescript": "^5.8.3",
+        "vite-plugin-dts": "^4.5.4"
+    }
 }

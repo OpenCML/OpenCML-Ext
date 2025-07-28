@@ -6,3 +6,8 @@ out
 node_modules
 client/server
 .vscode-test
+
+# TypeScript build cache
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+dist/

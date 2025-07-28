@@ -24,7 +24,8 @@ import {
 import { TextDocument, TextEdit } from 'vscode-languageserver-textdocument'
 import * as util from 'util'
 import * as child_process from 'child_process'
-
+import * as path from 'path'
+import { fileURLToPath } from 'url'
 // Create a connection for the server, using Node's IPC as a transport.
 // Also include all preview / proposed LSP features.
 const connection = createConnection(ProposedFeatures.all)
@@ -55,9 +56,14 @@ connection.onInitialize((params: InitializeParams) => {
 
     const result: InitializeResult = {
         capabilities: {
-            hoverProvider: true,
-            textDocumentSync: TextDocumentSyncKind.Incremental,
+            textDocumentSync: {
+                openClose: true,
+                change: TextDocumentSyncKind.Incremental,
+                willSave: true,
+                save: { includeText: true }
+            },
             // Tell the client that this server supports code completion.
+            hoverProvider: true,
             completionProvider: {
                 resolveProvider: true
             },
@@ -102,11 +108,16 @@ connection.onHover((params: HoverParams): Promise<Hover> => {
 
 connection.onDocumentFormatting(async (params: DocumentFormattingParams): Promise<TextEdit[]> => {
     const { textDocument } = params
+
+    if (!textDocument.uri.endsWith('.cml')) {
+        return []
+    }
     const doc = documents.get(textDocument.uri)!
+    const filePath = fileURLToPath(textDocument.uri)
     const text = doc.getText()
 
     try {
-        const formattedText = await formatCode(text)
+        const formattedText = await formatCode(text, filePath)
         const fullRange = Range.create(Position.create(0, 0), doc.positionAt(text.length))
         const edit: TextEdit = {
             range: fullRange,
@@ -169,11 +180,20 @@ connection.onDidChangeConfiguration(async () => {
 
 connection.languages.diagnostics.on(async (params) => {
     const document = documents.get(params.textDocument.uri)
+    documents.listen(connection);
+    if (!document || !document.uri.endsWith('.cml')) {
+        console.log('Skipping non-CML file:', document?.uri);
+        return {
+            kind: DocumentDiagnosticReportKind.Full,
+            items: []
+        };
+    }
     try {
+        const filePath = fileURLToPath(document.uri)
         if (document !== undefined) {
             return {
                 kind: DocumentDiagnosticReportKind.Full,
-                items: await validateCode(document.getText())
+                items: await validateCode(document.getText(), filePath)
             } satisfies DocumentDiagnosticReport
         } else {
             // We don't know the document. We can either try to read it from disk
@@ -199,14 +219,23 @@ interface ErrorInfo {
     message: string
 }
 
-export async function validateCode(codeText: string) {
+export async function validateCode(codeText: string, filePath: string) {
     try {
+        const sanitizedPath = `"${filePath.replace(/"/g, '\\"')}"`;
+
         console.log('using camel path:', globalSettings.camelPath)
+        console.log('checking file', filePath)
         const camelProcess = child_process.spawn(globalSettings.camelPath, [
+            'check',
             '--syntax-only',
-            '--error-format',
-            'json'
-        ])
+            '-O',
+            'json',
+            sanitizedPath
+        ], {
+            cwd: path.dirname(filePath),
+            shell: true, // Required for Windows path resolution
+            windowsVerbatimArguments: false // Allows automatic quoting
+        })
 
         camelProcess.on('error', (error) => {
             console.error('Error starting camel process:', error)
@@ -230,6 +259,10 @@ export async function validateCode(codeText: string) {
                 })
 
                 camelProcess.on('close', (code) => {
+
+                    console.log(`[DEBUG] Exit code: ${code}`);
+                    console.log('[DEBUG] stderr output:', stderr);
+
                     if (code !== 0) {
                         reject(new Error(`Camel process exited with code ${code}`))
                     } else {
@@ -245,22 +278,35 @@ export async function validateCode(codeText: string) {
         console.log('Validation stdout:', stdout)
         console.log('Validation stderr:', stderr)
 
-        const errors: ErrorInfo[] = []
 
-        for (const line of stdout.split('\n')) {
-            if (line === '') {
+        const errors: ErrorInfo[] = []
+        const lines = stdout.split('\n')
+        for (const line of lines) {
+            if (line.trim() === '' || !line.startsWith('{')) {
                 continue
             }
+            const trimmedLine = line.trim()
+            console.log('Parsing line:', trimmedLine)
             try {
-                const error = JSON.parse(line)
-                errors.push({
-                    filename: error.filename,
-                    line: error.line,
-                    column: error.column,
-                    message: error.message
+                const sanitizedLine = trimmedLine.replace(/\\/g, '\\\\')
+                const parsedLine = JSON.parse( sanitizedLine )
+                if (
+                    typeof parsedLine.line === 'number' &&
+                    typeof parsedLine.message === 'string'
+
+                ) {
+                    errors.push({
+                        filename: parsedLine.filename || filePath,
+                        line: parsedLine.line,
+                        column: Math.max(parsedLine.column || 1, 1), // the minimum value is 1
+                        message: parsedLine.message.replace(/\s+/g, ' ') // remove all whitespace
+                    })
+                }
+            } catch (parseError) {
+                console.error('Error parsing line:', {
+                    line: trimmedLine,
+                    error: parseError
                 })
-            } catch (error) {
-                console.error('Error parsing line:', error)
             }
         }
 
@@ -295,17 +341,19 @@ export async function validateCode(codeText: string) {
     }
 }
 
-export async function formatCode(codeText: string) {
+export async function formatCode(codeText: string, filePath: string) {
     try {
         console.log('using camel path:', globalSettings.camelPath)
-        const camelProcess = child_process.spawn(globalSettings.camelPath, ['--format'])
-
+        console.log('formatting file:', filePath)
+        const camelProcess = child_process.spawn(globalSettings.camelPath, ['format', filePath])
         camelProcess.on('error', (error) => {
             console.error('Error starting camel process:', error)
+            return codeText
         })
 
         if (!camelProcess.pid) {
-            throw new Error('Failed to start camel process, please make sure camel is installed')
+            console.error('Failed to start camel process, please make sure camel is installed')
+            return codeText
         }
 
         const { stdout, stderr } = await new Promise<{ stdout: string; stderr: string }>(
@@ -313,33 +361,34 @@ export async function formatCode(codeText: string) {
                 let formattedCode = ''
                 let stderr = ''
 
-                camelProcess.stdout.on('data', (data) => {
-                    formattedCode += data.toString().replace(/\r\n/g, '\n')
+                camelProcess.stdout.on('data', (data: Buffer) => {
+					formattedCode += data.toString().replace(/\r\n/g, '\n')
                 })
-
-                camelProcess.stderr.on('data', (data) => {
+                camelProcess.stderr.on('data', (data: Buffer) => {
                     stderr += data.toString()
                 })
 
                 camelProcess.on('close', (code) => {
-                    if (code !== 0) {
-                        reject(new Error(`Camel process exited with code ${code}`))
-                    } else {
-                        resolve({ stdout: formattedCode, stderr })
-                    }
+					console.log(`[DEBUG] Exit code: ${code}`)
+					console.log('[DEBUG] stderr output:', stderr)
+					console.log('[DEBUG] stdout output:', formattedCode)
+					if (code !== 0) {
+						reject(new Error(`Camel process exited with code ${code}, stderr: ${stderr}`))
+					} else {
+						resolve({ stdout: formattedCode, stderr })
+					}
                 })
 
                 camelProcess.stdin.write(codeText)
                 camelProcess.stdin.end()
             }
         )
-
-        if (stderr) {
-            throw new Error(stderr)
-        }
+		
+		if (stderr.trim() !== '') {
+			throw new Error(`Camel process exited with stderr: ${stderr}`)
+		}
 
         console.log('Formatted code:', stdout)
-
         return stdout
     } catch (error) {
         console.log('Error formatting code:', error)
