@@ -1,0 +1,13 @@
+diff --git a/lib/common/linkedMap.d.ts b/lib/common/linkedMap.d.ts
+index 1143ef940d07d75461d3e8ce39c9302910b12e1b..c03a9c1d4978a912a1d409555c1b40e51b133785 100644
+--- a/lib/common/linkedMap.d.ts
++++ b/lib/common/linkedMap.d.ts
+@@ -6,7 +6,7 @@ export declare namespace Touch {
+     const AsNew: 2;
+ }
+ export type Touch = 0 | 1 | 2;
+-export declare class LinkedMap<K, V> implements Map<K, V> {
++export declare class LinkedMap<K, V> {
+     readonly [Symbol.toStringTag] = "LinkedMap";
+     private _map;
+     private _head;

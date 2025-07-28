@@ -7,8 +7,7 @@
     "icon": "assets/icon.jpg",
     "type": "module",
     "scripts": {
-        "compile": "tsc -b",
-        "watch": "tsc -b -w",
+        "build": "pnpm -r run build",
         "pub": "node ./publish.js"
     },
     "engines": {
@@ -22,7 +21,7 @@
         "url": "https://github.com/Kogler7/OpenCML-Ext.git"
     },
     "activationEvents": [],
-    "main": "./client/out/extension",
+    "main": "./dist/extension/extension.js",
     "contributes": {
         "configuration": {
             "type": "object",
@@ -129,8 +128,9 @@
         ]
     },
     "devDependencies": {
-        "@types/jest": "^29.5.12",
-        "@vscode/vsce": "^2.31.1",
-        "typescript": "^5.4.5"
+        "@types/jest": "^30.0.0",
+        "@vscode/vsce": "^3.6.0",
+        "postinstall-postinstall": "^2.1.0",
+        "typescript": "^5.8.3"
     }
 }
