@@ -1,7 +1,40 @@
-**/*.ts
-test/
-**/tsconfig.json
-!file.ts
-**/package-lock.json
-rollup/
 .vscode/
+
+# 忽略所有源文件和构建配置
+**/*.ts
+**/*.vue
+**/*.tsx
+**/*.jsx
+**/*.map
+**/*.tsbuildinfo
+
+# 忽略源码目录
+client/**
+server/**
+webview/**
+
+# 忽略构建配置和 lock 文件
+vite.config.ts
+tsconfig.json
+tsconfig.*.json
+pnpm-lock.yaml
+pnpm-workspace.yaml
+*.log
+publish.js
+
+# 忽略测试文件
+test/**
+__tests__/**
+
+# 忽略 node_modules（尤其是 webview 里的）
+**/node_modules/**
+
+# 保留需要的文件和目录（注意：vsce 是“排除优先”，保留要通过精确路径）
+!dist/**
+!syntaxes/**
+!assets/**
+!README.md
+!CHANGELOG.md
+!LICENSE
+!language-configuration.json
+!package.json

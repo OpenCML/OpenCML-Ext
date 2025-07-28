@@ -1,0 +1,7 @@
+packages:
+  - client
+  - server
+  - webview
+
+patchedDependencies:
+  vscode-jsonrpc: patches/vscode-jsonrpc.patch
