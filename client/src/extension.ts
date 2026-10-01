@@ -9,9 +9,11 @@ import {
     TransportKind
 } from 'vscode-languageclient/node'
 import { detectToolchain, spawnHint } from './toolchain'
+import { CamelDebugAdapterFactory } from './debug/adapter'
 
 let client: LanguageClient
 let outputChannel: vscode.OutputChannel | undefined
+let debugFactory: CamelDebugAdapterFactory | undefined
 
 function getCamelPath(): string {
     const config = vscode.workspace.getConfiguration('opencmlLanguageServer')
@@ -190,6 +192,7 @@ function registerGirPanel(context: vscode.ExtensionContext): GirPanelState {
                     } else {
                         state.breakpoints.delete(key)
                     }
+                    debugFactory?.syncNodeBreakpoints([...state.breakpoints])
                     return
                 }
                 case 'alert':
@@ -297,6 +300,43 @@ export function activate(context: vscode.ExtensionContext) {
             }
             if (girState.fileUri && document.uri.fsPath === girState.fileUri) {
                 renderForFile(girState, document.uri.fsPath, false)
+            }
+        })
+    )
+
+    // Debugging: bridge VSCode's DAP to the camel-db HTTP API.
+    debugFactory = new CamelDebugAdapterFactory(context)
+    context.subscriptions.push(
+        vscode.debug.registerDebugAdapterDescriptorFactory('camel', debugFactory)
+    )
+    context.subscriptions.push(
+        vscode.debug.onDidTerminateDebugSession((session) => {
+            debugFactory?.disposeSession(session)
+        })
+    )
+    context.subscriptions.push(
+        vscode.debug.registerDebugConfigurationProvider('camel', {
+            resolveDebugConfiguration(folder, config) {
+                if (!config.program) {
+                    const editor = vscode.window.activeTextEditor
+                    if (editor?.document.languageId === 'cml') {
+                        config.program = editor.document.uri.fsPath
+                    }
+                }
+                if (config.debugPort === undefined) {
+                    const settings = vscode.workspace.getConfiguration('opencmlLanguageServer', folder?.uri)
+                    config.debugPort = settings.get<number>('debugPort') ?? 8765
+                }
+                if (!config.camelDbPath) {
+                    const settings = vscode.workspace.getConfiguration('opencmlLanguageServer', folder?.uri)
+                    const configured = settings.get<string>('camelDbPath')?.trim()
+                    if (configured) {
+                        config.camelDbPath = configured
+                    } else {
+                        config.camelDbPath = detectToolchain(getCamelPath()).camelDb ?? undefined
+                    }
+                }
+                return config
             }
         })
     )

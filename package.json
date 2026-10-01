@@ -98,6 +98,82 @@
                 "title": "Format Camel Code"
             }
         ],
+        "debuggers": [
+            {
+                "type": "camel",
+                "label": "Camel Debug",
+                "languages": [
+                    "cml"
+                ],
+                "configurationAttributes": {
+                    "launch": {
+                        "required": [
+                            "program"
+                        ],
+                        "properties": {
+                            "program": {
+                                "type": "string",
+                                "description": "Absolute path of the CML file to debug.",
+                                "default": "${file}"
+                            },
+                            "debugPort": {
+                                "type": "number",
+                                "description": "Port camel-db serves its API on.",
+                                "default": 8765
+                            },
+                            "camelDbPath": {
+                                "type": "string",
+                                "description": "Path to camel-db. Default: resolved next to the Camel executable."
+                            }
+                        }
+                    },
+                    "attach": {
+                        "properties": {
+                            "debugPort": {
+                                "type": "number",
+                                "description": "Port of a running camel-db instance.",
+                                "default": 8765
+                            }
+                        }
+                    }
+                },
+                "initialConfigurations": [
+                    {
+                        "type": "camel",
+                        "request": "launch",
+                        "name": "Debug Camel file",
+                        "program": "${file}"
+                    }
+                ],
+                "configurationSnippets": [
+                    {
+                        "label": "Camel: Debug current file",
+                        "description": "Launch camel-db and debug the current CML file.",
+                        "body": {
+                            "type": "camel",
+                            "request": "launch",
+                            "name": "Debug Camel file",
+                            "program": "${file}"
+                        }
+                    },
+                    {
+                        "label": "Camel: Attach to running camel-db",
+                        "description": "Attach to a camel-db instance already serving on a port.",
+                        "body": {
+                            "type": "camel",
+                            "request": "attach",
+                            "name": "Attach to camel-db",
+                            "debugPort": 8765
+                        }
+                    }
+                ]
+            }
+        ],
+        "breakpoints": [
+            {
+                "language": "cml"
+            }
+        ],
         "languages": [
             {
                 "id": "cml",

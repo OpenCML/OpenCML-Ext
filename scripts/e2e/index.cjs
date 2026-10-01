@@ -123,6 +123,26 @@ function run(testsRoot, callback) {
         const tabs = vscode.window.tabGroups.all.flatMap((g) => g.tabs).map((t) => t.label)
         assert(tabs.includes('GraphIR'), `GraphIR panel not opened; tabs: ${tabs.join(', ')}`)
         console.log('VIZGIR_OK')
+
+        // Debug: launch camel-db through the DAP bridge, check the session
+        // answers threads, then stop it (which must terminate camel-db).
+        const started = await vscode.debug.startDebugging(undefined, {
+            type: 'camel',
+            request: 'launch',
+            name: 'E2E Camel Debug',
+            program: path.join(workspaceFolder.uri.fsPath, 'fib.cml'),
+            debugPort: 18799
+        })
+        assert(started, 'debug session failed to start')
+        await new Promise((r) => setTimeout(r, 5000))
+        const session = vscode.debug.activeDebugSession
+        assert(session && session.type === 'camel', 'no active camel debug session')
+        const threads = await session.customRequest('threads')
+        assert(Array.isArray(threads.threads) && threads.threads.length >= 1, 'no threads from debug adapter')
+        await vscode.debug.stopDebugging(session)
+        await new Promise((r) => setTimeout(r, 1500))
+        assert(!vscode.debug.activeDebugSession, 'debug session did not stop')
+        console.log('DEBUG_OK')
     })().then(
         () => callback(null),
         (err) => callback(err instanceof Error ? err : new Error(String(err)))
