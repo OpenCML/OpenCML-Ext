@@ -233,17 +233,32 @@ export function activate(context: vscode.ExtensionContext) {
     )
 
     // LSP related code
+    //
+    // Preferred: the standardized Camel language server (camel-ls), spawned directly.
+    // Fallback: the bundled Node language server, which shells out to the Camel CLI
+    // (used when camel-ls is not locatable next to the configured camel executable).
 
-    // The server is implemented in node
-    const serverModule = context.asAbsolutePath(path.join('dist', 'server', 'server.cjs'))
+    const toolchain = detectToolchain(getCamelPath())
+    toolchain.warnings.forEach((w) => vscode.window.showWarningMessage(w))
 
-    // If the extension is launched in debug mode then the debug server options are used
-    // Otherwise the run options are used
-    const serverOptions: ServerOptions = {
-        run: { module: serverModule, transport: TransportKind.ipc },
-        debug: {
-            module: serverModule,
-            transport: TransportKind.ipc
+    let serverOptions: ServerOptions
+    if (toolchain.camelLs) {
+        serverOptions = {
+            run: { command: toolchain.camelLs, args: ['--stdio'], transport: TransportKind.stdio },
+            debug: {
+                command: toolchain.camelLs,
+                args: ['--stdio'],
+                transport: TransportKind.stdio
+            }
+        }
+    } else {
+        const serverModule = context.asAbsolutePath(path.join('dist', 'server', 'server.cjs'))
+        serverOptions = {
+            run: { module: serverModule, transport: TransportKind.ipc },
+            debug: {
+                module: serverModule,
+                transport: TransportKind.ipc
+            }
         }
     }
 

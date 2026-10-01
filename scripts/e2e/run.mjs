@@ -13,6 +13,7 @@ const camelExe =
     process.env.CAMEL_EXE_PATH || 'D:/Projects/Camel/out/latest/bin/camel.exe'
 
 // Prepare a temp workspace with fixtures and a workspace-level camelPath setting.
+const mode = process.env.E2E_MODE || 'full'
 const workspace = fs.mkdtempSync(path.join(os.tmpdir(), 'opencml-e2e-'))
 for (const entry of fs.readdirSync(path.join(repoRoot, 'test', 'test'))) {
     if (entry.endsWith('.cml')) {
@@ -23,14 +24,18 @@ for (const entry of fs.readdirSync(path.join(repoRoot, 'test', 'test'))) {
     }
 }
 fs.mkdirSync(path.join(workspace, '.vscode'), { recursive: true })
+const camelPathSetting =
+    mode === 'fallback' ? 'C:/definitely-not-exists/camel.exe' : camelExe
 fs.writeFileSync(
     path.join(workspace, '.vscode', 'settings.json'),
-    JSON.stringify({ 'opencmlLanguageServer.camelPath': camelExe }, null, 4)
+    JSON.stringify({ 'opencmlLanguageServer.camelPath': camelPathSetting }, null, 4)
 )
+fs.writeFileSync(path.join(workspace, 'mode.txt'), mode)
 console.log('E2E workspace:', workspace)
+console.log('E2E mode:', mode)
 console.log('Camel exe:', camelExe)
 
-if (!fs.existsSync(camelExe)) {
+if (mode !== 'fallback' && !fs.existsSync(camelExe)) {
     console.error(`Camel executable not found: ${camelExe}`)
     console.error('Set CAMEL_EXE_PATH to a valid camel.exe and retry.')
     process.exit(1)
