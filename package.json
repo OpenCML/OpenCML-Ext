@@ -1,8 +1,8 @@
 {
     "name": "open-cml-extension",
     "displayName": "OpenCML-Ext",
-    "description": "OpenCML Extension for VSCode",
-    "version": "0.7.0",
+    "description": "OpenCML Extension for VSCode — GraphIR visualization and Camel debugging",
+    "version": "1.0.0",
     "publisher": "Kogler7",
     "icon": "assets/icon.jpg",
     "type": "module",

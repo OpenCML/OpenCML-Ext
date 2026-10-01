@@ -4,16 +4,29 @@ All notable changes to the "OpenCML-Ext" extension will be documented in this fi
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## [0.7.0] - 2026-10-01
+## [1.0.0] - 2026-10-01
+
+First release centered on GraphIR visualization and debugging, with language services standardized on `camel-ls`.
+
+### Added
+
+- **GraphIR visualization panel** (interactive, Vue Flow based): pass picker (`std::rgir` / `std::agir` / `std::gir`), auto-refresh on save, node attribute inspection, nested function/cluster rendering, double-click node breakpoints.
+- **Debugging**: `camel` debug adapter bridging DAP to `camel-db` (HTTP API). Launch (auto-spawn `camel-db --serve`) and attach; run/continue/restart/stop; pause detection with reason; logs streamed to Debug Console; GIR node breakpoints synced to the debugger.
+- **Toolchain detection**: `camelPath` may point at the executable or its `bin` directory; `camel-ls` / `camel-format` / `camel-db` auto-detected; structured errors instead of silent failures.
+- Settings: `camelDbPath`, `debugPort`.
+- E2E suite: real-VSCode tests for diagnostics/formatting (via `camel-ls`), the GraphIR panel, and the full debug session lifecycle; fallback-mode E2E for the bundled Node language server.
 
 ### Changed
 
-- Adapted to the latest Camel toolchain (v0.1.23):
-  - Diagnostics now run `camel check -O json` against a temporary copy of the buffer (next to the real file, so relative imports still resolve) and map the new diagnostic schema (0-based ranges, `Error|Warn|Info|Hint` severities, suggestions appended to messages) onto LSP diagnostics.
-  - Formatting now uses the standalone `camel-format` executable, resolved next to the configured `camelPath` (`camel` -> `camel-format`, `camel.exe` -> `camel-format.exe`).
-  - `Camel: Run Camel` now actually runs the active file with the Camel CLI and streams stdout/stderr to a "Camel" output channel.
-  - `Camel: Visualize GraphIR` now runs `camel <file> std::rgir`, extracts the DOT graph and renders it in the graphviz webview panel (@hpcc-js/wasm).
-- E2E smoke test extended: hover, diagnostics, formatting and GraphIR panel are all exercised against a real Camel build.
+- Language services now prefer `camel-ls` (spawned over stdio) and fall back to the bundled Node server when it is missing.
+
+### Fixed (Camel-side, required for this release)
+
+- `camel-ls` was unusable since its creation: Windows text mode corrupted LSP framing (CRLF double-translation) and an uncaught exception aborted the process during `initialize`. Fixed in the Camel repo (`tools/lang-server`), which also added pull diagnostics (full `camel check` semantic pipeline) and `documentFormatting`.
+
+## [0.7.0] - 2026-10-01
+
+- Adapted to the Camel v0.1.23 toolchain: diagnostics via the new `camel check -O json` schema, formatting via the standalone `camel-format`, real `camel run` command, GraphIR panel rendering DOT via @hpcc-js/wasm.
 
 ## [0.6.0]
 
