@@ -27,7 +27,16 @@ A Camel toolchain build (`camel.exe`, `camel-ls.exe`, `camel-format.exe`, `camel
 
 Full debug adapter (`camel` debug type). `F5` on a `.cml` file launches `camel-db` and streams execution to the Debug Console. Supports launch (auto-spawns `camel-db`) and attach (to a running `camel-db --serve <port>`).
 
-Current capabilities: run / continue / restart / stop, node breakpoints from the GraphIR panel, pause detection with reason. Line-level breakpoints and stepping need source spans and node-level stepping on the Camel side (on the Camel roadmap).
+Capabilities:
+
+- run / continue / restart / stop, natural termination when the script finishes
+- **line breakpoints**: verified against GIR node source spans (unverified ones explain why and activate once a node maps to the line)
+- **node breakpoints**: double-click a node in the GraphIR panel (synced by node origin — the same identity the debugger reports)
+- **stepping**: step over (next node in the current graph) and step in (next node anywhere), mapped to `camel-db` node-level single-step
+- stack frames mapped to source locations; the paused node is highlighted in the GraphIR panel
+- pause detection with reason (breakpoint / step)
+
+These require a Camel build with node-level debugging support (origin spans in `rgir`/`gir-json`, the always-on GIR node hook, and the `/api/step` endpoint — delivered on the Camel side in v0.1.23+).
 
 ### Language features
 
@@ -55,7 +64,7 @@ VSCode
 ```
 
 - Language server: `camel-ls` is spawned directly when available; otherwise the bundled Node server shells out to the Camel CLI (fallback).
-- Debug adapter: an inline Node adapter translates DAP to the `camel-db` HTTP API (`run`/`continue`/`restart`/`terminate`, pause polling, log streaming).
+- Debug adapter: an inline Node adapter translates DAP to the `camel-db` HTTP API (`run`/`continue`/`step`/`restart`/`terminate`, pause polling, log streaming). Line breakpoints and stack frames are resolved through gir-json source spans; panel breakpoints and debugger hits share the GIR node origin as their common identity.
 
 ## Development
 

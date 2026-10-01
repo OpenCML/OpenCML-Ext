@@ -33,23 +33,51 @@ const autoRefresh = ref(true)
 const selectedNode = ref<FlowNode['data'] & { id: string } | null>(null)
 const useSvgFallback = ref(false)
 const svgContainer = ref<HTMLElement | null>(null)
+const pausedOrigin = ref(0)
 
 const breakpoints = new Set<string>()
 
 let graphviz: Graphviz | null = null
 let pendingDot: RenderMessage | null = null
 
+function nodeOrigin(data: unknown): number {
+    const attrs = (data as { attrs?: Record<string, string> })?.attrs
+    const origin = Number(attrs?.origin)
+    return Number.isFinite(origin) && origin > 0 ? origin : 0
+}
+
+function parseSpan(span: string | undefined): { line: number; character: number } | null {
+    if (!span) return null
+    const m = /^(\d+):(\d+)-(\d+):(\d+)$/.exec(span)
+    if (!m) return null
+    return { line: Number(m[1]), character: Number(m[2]) }
+}
+
+/** Recompute per-node flags (breakpoint, paused) over the current node list. */
+function decorate(list: Node[]): Node[] {
+    return list.map((vn) => ({
+        ...vn,
+        data: {
+            ...vn.data,
+            breakpoint: breakpoints.has(vn.id),
+            paused: vn.type === 'gir' && pausedOrigin.value > 0 && nodeOrigin(vn.data) === pausedOrigin.value
+        }
+    }))
+}
+
 function toVueFlow(model: { nodes: FlowNode[]; edges: FlowEdge[] }): { nodes: Node[]; edges: Edge[] } {
     return {
-        nodes: model.nodes.map((n) => ({
-            id: n.id,
-            type: n.type,
-            position: n.position,
-            data: { ...n.data, breakpoint: breakpoints.has(n.id) },
-            draggable: false,
-            connectable: false,
-            selectable: n.type !== 'cluster'
-        })),
+        nodes: decorate(
+            model.nodes.map((n) => ({
+                id: n.id,
+                type: n.type,
+                position: n.position,
+                data: { ...n.data },
+                draggable: false,
+                connectable: false,
+                selectable: n.type !== 'cluster'
+            }))
+        ),
         edges: model.edges.map((e) => ({
             id: e.id,
             source: e.source,
@@ -124,10 +152,26 @@ function onNodeDoubleClick(event: { node: Node }) {
     } else {
         breakpoints.add(n.id)
     }
-    vscode.postMessage({ command: 'nodeBreakpoint', nodeKey: n.id, enabled: !had })
+    vscode.postMessage({
+        command: 'nodeBreakpoint',
+        nodeKey: n.id,
+        origin: nodeOrigin(n.data) || undefined,
+        enabled: !had
+    })
     nodes.value = nodes.value.map((vn) =>
         vn.id === n.id ? { ...vn, data: { ...vn.data, breakpoint: !had } } : vn
     )
+}
+
+function revealSelectedSource() {
+    const data = selectedNode.value as (FlowNode['data'] & { attrs?: Record<string, string> }) | null
+    if (!data) return
+    const span = parseSpan(data.attrs?.span)
+    const file = data.attrs?.srcfile
+    if (!span || !file) {
+        return
+    }
+    vscode.postMessage({ command: 'revealSource', file, line: span.line, character: span.character })
 }
 
 function refresh() {
@@ -143,14 +187,14 @@ function onMessage(event: MessageEvent) {
     if (!message || typeof message !== 'object') return
     if (message.command === 'render') {
         renderDotMessage(message as RenderMessage)
+    } else if (message.command === 'pausedOrigin') {
+        pausedOrigin.value = typeof message.origin === 'number' ? message.origin : 0
+        nodes.value = decorate(nodes.value)
     } else if (message.command === 'setBreakpoints') {
         const list: string[] = Array.isArray(message.nodes) ? message.nodes : []
         breakpoints.clear()
         list.forEach((k) => breakpoints.add(k))
-        nodes.value = nodes.value.map((vn) => ({
-            ...vn,
-            data: { ...vn.data, breakpoint: breakpoints.has(vn.id) }
-        }))
+        nodes.value = decorate(nodes.value)
     }
 }
 
@@ -211,7 +255,17 @@ onUnmounted(() => {
                 <div>label: {{ selectedNode.label }}</div>
                 <div>type: {{ selectedNode.nodeType }}</div>
                 <div v-if="selectedNode.role">role: {{ selectedNode.role }}</div>
+                <div v-if="selectedNode.attrs && selectedNode.attrs.span">
+                    src: {{ selectedNode.attrs.srcfile }}:{{ selectedNode.attrs.span }}
+                </div>
                 <div class="hint">双击节点切换断点</div>
+                <button
+                    v-if="selectedNode.attrs && selectedNode.attrs.span && selectedNode.attrs.srcfile"
+                    class="reveal"
+                    @click="revealSelectedSource"
+                >
+                    跳转到源码
+                </button>
             </div>
         </div>
     </div>
@@ -306,6 +360,21 @@ body,
     margin-top: 6px;
     color: #888;
     font-size: 11px;
+}
+
+.info .reveal {
+    margin-top: 6px;
+    background: #0e639c;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 3px 10px;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.info .reveal:hover {
+    background: #1177bb;
 }
 
 .svg-fallback {

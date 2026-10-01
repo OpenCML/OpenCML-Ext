@@ -124,24 +124,103 @@ function run(testsRoot, callback) {
         assert(tabs.includes('GraphIR'), `GraphIR panel not opened; tabs: ${tabs.join(', ')}`)
         console.log('VIZGIR_OK')
 
-        // Debug: launch camel-db through the DAP bridge, check the session
-        // answers threads, then stop it (which must terminate camel-db).
+        // Debug: launch camel-db through the DAP bridge against a long-running
+        // fibonacci(28) so breakpoints set after launch still land mid-run, then
+        // drive the lifecycle: verify+pause at the breakpoint, step over (pause
+        // again), continue to completion (session terminates naturally once the
+        // task completes).
+        const fibPath = path.join(workspaceFolder.uri.fsPath, 'fib_slow.cml')
         const started = await vscode.debug.startDebugging(undefined, {
             type: 'camel',
             request: 'launch',
             name: 'E2E Camel Debug',
-            program: path.join(workspaceFolder.uri.fsPath, 'fib.cml'),
+            program: fibPath,
             debugPort: 18799
         })
         assert(started, 'debug session failed to start')
-        await new Promise((r) => setTimeout(r, 5000))
-        const session = vscode.debug.activeDebugSession
+        let session = vscode.debug.activeDebugSession
         assert(session && session.type === 'camel', 'no active camel debug session')
-        const threads = await session.customRequest('threads')
-        assert(Array.isArray(threads.threads) && threads.threads.length >= 1, 'no threads from debug adapter')
-        await vscode.debug.stopDebugging(session)
-        await new Promise((r) => setTimeout(r, 1500))
-        assert(!vscode.debug.activeDebugSession, 'debug session did not stop')
+
+        // The recursive-call line is covered by GIR node spans and executes on
+        // several calls, so a breakpoint here fires early and leaves plenty of
+        // nodes to step through.
+        const bpResp = await session.customRequest('setBreakpoints', {
+            source: { path: fibPath },
+            breakpoints: [{ line: 6 }]
+        })
+        assert(
+            Array.isArray(bpResp?.breakpoints) && bpResp.breakpoints.length === 1,
+            'setBreakpoints returned no breakpoint'
+        )
+
+        const stackFrame = async () => {
+            const st = await session.customRequest('stackTrace', { threadId: 1 })
+            return st.stackFrames?.[0]
+        }
+        // Pause detection: while stopped, the adapter maps the paused node's span
+        // onto the frame; while running, frames carry line 0.
+        let frame = null
+        for (let i = 0; i < 80; i++) {
+            await new Promise((r) => setTimeout(r, 500))
+            if (!vscode.debug.activeDebugSession) break
+            try {
+                const f = await stackFrame()
+                if (f && f.line > 0) {
+                    frame = f
+                    break
+                }
+            } catch {
+                break
+            }
+        }
+        assert(
+            frame && frame.line > 0,
+            `never paused at the line breakpoint; last frame: ${JSON.stringify(frame)}`
+        )
+        assert(
+            frame.source && path.normalize(frame.source.path) === path.normalize(fibPath),
+            `paused in unexpected source: ${frame.source?.path}`
+        )
+        console.log('DEBUG_BP_OK: paused at', frame.name, 'line', frame.line)
+
+        // Step over: must pause again at the next node.
+        await session.customRequest('next', { threadId: 1 })
+        let stepped = false
+        for (let i = 0; i < 60; i++) {
+            await new Promise((r) => setTimeout(r, 500))
+            if (!vscode.debug.activeDebugSession) break
+            try {
+                const f = await stackFrame()
+                if (f && f.line > 0) {
+                    stepped = true
+                    break
+                }
+            } catch {
+                break
+            }
+        }
+        assert(stepped, 'step over did not pause at the next node')
+        console.log('DEBUG_STEP_OK')
+
+        // The line-6 breakpoint still fires on every recursive call: clear it so
+        // continue can run to completion.
+        await session.customRequest('setBreakpoints', {
+            source: { path: fibPath },
+            breakpoints: []
+        })
+
+        // Continue to completion: the worker reports taskState=completed and the
+        // adapter must end the session on its own.
+        await session.customRequest('continue', { threadId: 1 })
+        let ended = false
+        for (let i = 0; i < 60; i++) {
+            await new Promise((r) => setTimeout(r, 500))
+            if (!vscode.debug.activeDebugSession) {
+                ended = true
+                break
+            }
+        }
+        assert(ended, 'debug session did not terminate after the run completed')
         console.log('DEBUG_OK')
     })().then(
         () => callback(null),

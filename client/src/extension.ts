@@ -128,7 +128,8 @@ interface GirPanelState {
     fileUri: string | null
     pass: string
     autoRefresh: boolean
-    breakpoints: Set<string>
+    /** nodeKey -> GIR node origin (null when the node has none). */
+    breakpoints: Map<string, number | null>
     pendingDot: string | null
 }
 
@@ -140,7 +141,7 @@ function registerGirPanel(context: vscode.ExtensionContext): GirPanelState {
         fileUri: null,
         pass: 'std::rgir',
         autoRefresh: true,
-        breakpoints: new Set<string>(),
+        breakpoints: new Map<string, number | null>(),
         pendingDot: null
     }
 
@@ -187,12 +188,35 @@ function registerGirPanel(context: vscode.ExtensionContext): GirPanelState {
                     return
                 case 'nodeBreakpoint': {
                     const key = String(message.nodeKey)
+                    const origin = typeof message.origin === 'number' ? message.origin : null
                     if (message.enabled) {
-                        state.breakpoints.add(key)
+                        state.breakpoints.set(key, origin)
                     } else {
                         state.breakpoints.delete(key)
                     }
-                    debugFactory?.syncNodeBreakpoints([...state.breakpoints])
+                    syncPanelBreakpoints(state)
+                    return
+                }
+                case 'revealSource': {
+                    const file = String(message.file ?? '')
+                    if (!file) {
+                        return
+                    }
+                    const line = Math.max(0, Number(message.line ?? 0))
+                    const column = Math.max(0, Number(message.character ?? 0))
+                    const target = path.isAbsolute(file)
+                        ? file
+                        : state.fileUri
+                          ? path.join(path.dirname(state.fileUri), file)
+                          : file
+                    void vscode.workspace.openTextDocument(target).then(
+                        (doc) =>
+                            vscode.window.showTextDocument(doc, {
+                                selection: new vscode.Range(line, column, line, column),
+                                preview: true
+                            }),
+                        () => vscode.window.showWarningMessage(`Cannot open ${target}`)
+                    )
                     return
                 }
                 case 'alert':
@@ -216,6 +240,12 @@ function registerGirPanel(context: vscode.ExtensionContext): GirPanelState {
 }
 
 let girState: GirPanelState | null = null
+
+/** Push the panel's origin breakpoints into active debug sessions. */
+function syncPanelBreakpoints(state: GirPanelState) {
+    const origins = [...state.breakpoints.values()].filter((o): o is number => o !== null && o > 0)
+    void debugFactory?.syncNodeBreakpoints(origins)
+}
 
 async function showGirPanel(context: vscode.ExtensionContext) {
     const editor = vscode.window.activeTextEditor
@@ -306,6 +336,9 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Debugging: bridge VSCode's DAP to the camel-db HTTP API.
     debugFactory = new CamelDebugAdapterFactory(context)
+    debugFactory.onDidChangePausedNode = (origin) => {
+        girState?.panel.webview.postMessage({ command: 'pausedOrigin', origin })
+    }
     context.subscriptions.push(
         vscode.debug.registerDebugAdapterDescriptorFactory('camel', debugFactory)
     )

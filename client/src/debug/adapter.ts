@@ -1,7 +1,8 @@
 // Debug Adapter translating DAP to the camel-db HTTP API.
 // camel-db owns execution: this adapter spawns (launch) or connects to (attach)
-// the debugger gateway and forwards run/continue/restart/terminate plus pause
-// detection and log streaming.
+// the debugger gateway and forwards run/continue/step/restart/terminate, maps
+// line breakpoints to GIR node origins via gir-json source spans, and reports
+// pause/terminate state polled from the gateway.
 import * as vscode from 'vscode'
 import * as child_process from 'child_process'
 import * as fs from 'fs'
@@ -15,13 +16,21 @@ export interface CamelLaunchArguments {
     camelDbPath?: string
 }
 
+interface CamelDbPausedNode {
+    nodeId: string
+    graphId: string
+    origin: number
+    ref: number
+}
+
 interface CamelDbTask {
     id: string
     port: number
     scriptPath: string
     taskState: string
     paused: boolean
-    pauseReason?: string
+    pauseReason?: { phase?: string; origin?: number; ref?: number; graphId?: string; nodeId?: string }
+    pausedNode?: CamelDbPausedNode
 }
 
 interface CamelDbState {
@@ -31,7 +40,34 @@ interface CamelDbState {
     tasks?: CamelDbTask[]
 }
 
+interface GirSpan {
+    file: string
+    startLine: number
+    startCharacter: number
+    endLine: number
+    endCharacter: number
+}
+
+interface GirNodeJson {
+    id: number
+    graphId: string
+    type: string
+    originId?: number
+    span?: GirSpan
+}
+
+interface GirGraphJson {
+    id?: string
+    name?: string
+    children?: { id: string; name?: string }[]
+    nodes?: GirNodeJson[]
+}
+
 const DEFAULT_PORT = 8765
+
+function normalizeFile(p: string): string {
+    return path.resolve(p).replace(/\\/g, '/').toLowerCase()
+}
 
 export class CamelDebugSession implements vscode.DebugAdapter {
     private static nextHandle = 1
@@ -44,11 +80,32 @@ export class CamelDebugSession implements vscode.DebugAdapter {
     private camelDb: child_process.ChildProcess | null = null
     private poller: NodeJS.Timeout | null = null
     private wasPaused = false
-    private hadTasks = false
     private disposed = false
     private program = ''
+    private taskId = ''
     private parentLogOffset = 0
-    private readonly nodeBreakpointIds = new Set<string>()
+    private readonly nodeBreakpointOrigins = new Set<number>()
+
+    // Line-breakpoint bookkeeping: DAP ids we assigned + verification state.
+    private nextBreakpointId = 1
+    private readonly lineBreakpoints = new Map<
+        string,
+        { id: number; line: number; verified: boolean; message?: string }[]
+    >()
+    private girOriginIndex: Map<number, GirNodeJson & { graphName?: string }> | null = null
+    private girLineIndex: Map<string, Map<number, number[]>> | null = null
+    private girIndexAttempted = false
+    private readonly lineBreakpointOrigins = new Set<number>()
+
+    // Debug state.
+    private lastPausedGraphId = ''
+    private lastPausedOrigin = 0
+    private expectStepStop = false
+    private runActive = false
+    private runTerminated = false
+
+    /** Fired whenever the paused node changes; used to highlight the GIR panel. */
+    onDidChangePausedNode: ((origin: number | null) => void) | null = null
 
     handleMessage(message: unknown): void {
         const request = message as { seq?: number; command?: string; arguments?: any }
@@ -67,10 +124,10 @@ export class CamelDebugSession implements vscode.DebugAdapter {
         this.messageEmitter.dispose()
     }
 
-    /** Sync GIR node breakpoints (from the GraphIR panel) to camel-db. */
-    async setNodeBreakpoints(nodeIds: string[]): Promise<void> {
-        this.nodeBreakpointIds.clear()
-        nodeIds.forEach((id) => this.nodeBreakpointIds.add(id))
+    /** Sync GIR node breakpoints (origins from the GraphIR panel) to camel-db. */
+    async setNodeBreakpoints(origins: number[]): Promise<void> {
+        this.nodeBreakpointOrigins.clear()
+        origins.forEach((o) => this.nodeBreakpointOrigins.add(o))
         await this.pushNodeBreakpoints()
     }
 
@@ -83,10 +140,8 @@ export class CamelDebugSession implements vscode.DebugAdapter {
                     supportsStepBack: false,
                     supportsRestartRequest: true,
                     supportsTerminateRequest: true,
-                    // camel has no line-level stepping yet (node-level step is a
-                    // planned camel-db feature), so keep stepping disabled.
-                    supportsStepOver: false,
-                    supportsStepIn: false,
+                    supportsStepOver: true,
+                    supportsStepIn: true,
                     supportsStepOut: false,
                     supportsPauseRequest: false
                 })
@@ -101,24 +156,38 @@ export class CamelDebugSession implements vscode.DebugAdapter {
                 return
 
             case 'setBreakpoints':
-                // Line breakpoints need source spans on GIR nodes (camel side).
-                // Until then, breakpoints are set on GIR nodes from the GraphIR panel.
-                this.respond(request, {
-                    breakpoints: (request.arguments?.breakpoints ?? []).map(() => ({
-                        verified: false,
-                        message: 'Line breakpoints need Camel source-span support; use GraphIR node breakpoints (double-click a node) instead.'
-                    }))
-                })
+                await this.setLineBreakpoints(request)
                 return
 
             case 'continue':
-                await apiPost(this.port, '/api/continue')
+                await apiPost(this.port, '/api/continue', { target: this.taskId })
                 this.respond(request, { allThreadsContinued: true })
                 return
 
+            case 'next':
+                // Step over: pause at the next node of the graph we are stopped in.
+                await apiPost(this.port, '/api/step', {
+                    target: this.taskId,
+                    graphId: this.lastPausedGraphId
+                })
+                this.expectStepStop = true
+                this.respond(request, {})
+                return
+
+            case 'stepIn':
+                // Step in: pause at the next node in any graph.
+                await apiPost(this.port, '/api/step', { target: this.taskId })
+                this.expectStepStop = true
+                this.respond(request, {})
+                return
+
             case 'restart':
-                await apiPost(this.port, '/api/restart')
+                await apiPost(this.port, '/api/restart', { target: this.taskId })
                 this.wasPaused = false
+                this.runActive = true
+                this.runTerminated = false
+                this.girIndexAttempted = true
+                void this.refreshGirIndex()
                 this.respond(request, {})
                 return
 
@@ -133,17 +202,9 @@ export class CamelDebugSession implements vscode.DebugAdapter {
                 this.respond(request, { threads: [{ id: 1, name: 'main' }] })
                 return
 
-            case 'stackTrace': {
-                const frame = {
-                    id: CamelDebugSession.nextHandle++,
-                    name: 'main',
-                    line: 0,
-                    column: 0,
-                    source: this.program ? { path: this.program, name: this.program.split(/[\\/]/).pop() } : undefined
-                }
-                this.respond(request, { stackFrames: [frame], totalFrames: 1 })
+            case 'stackTrace':
+                this.respond(request, { stackFrames: [this.currentStackFrame()], totalFrames: 1 })
                 return
-            }
 
             case 'scopes':
                 this.respond(request, { scopes: [] })
@@ -156,6 +217,178 @@ export class CamelDebugSession implements vscode.DebugAdapter {
             default:
                 this.respond(request, undefined, false, `Unsupported request: ${request.command}`)
         }
+    }
+
+    private currentStackFrame() {
+        const id = CamelDebugSession.nextHandle++
+        const frame: Record<string, unknown> = { id, name: 'main', line: 0, column: 0 }
+        const node = this.lastPausedOriginNode()
+        if (node?.span) {
+            frame.name = node.graphName || node.graphId || 'main'
+            // gir-json spans are 0-based LSP-style; DAP is 1-based.
+            frame.line = node.span.startLine + 1
+            frame.column = node.span.startCharacter + 1
+            frame.source = { path: node.span.file, name: node.span.file.split(/[\\/]/).pop() }
+        } else if (this.program) {
+            frame.source = { path: this.program, name: this.program.split(/[\\/]/).pop() }
+        }
+        return frame
+    }
+
+    private lastPausedOriginNode(): (GirNodeJson & { graphName?: string }) | null {
+        if (!this.girOriginIndex || !this.lastPausedOrigin) {
+            return null
+        }
+        return this.girOriginIndex.get(this.lastPausedOrigin) ?? null
+    }
+
+    private async setLineBreakpoints(request: { seq?: number; arguments?: any }): Promise<void> {
+        const args = request.arguments ?? {}
+        const sourcePath: string = args.source?.path ?? this.program
+        const requested: { line: number }[] = args.breakpoints ?? []
+        const key = normalizeFile(sourcePath)
+        const existing = this.lineBreakpoints.get(key) ?? []
+        const entries = requested.map((bp) => {
+            const known = existing.find((e) => e.line === bp.line)
+            const id = known?.id ?? this.nextBreakpointId++
+            const verified = this.lineMapsToOrigin(key, bp.line)
+            return {
+                id,
+                line: bp.line,
+                verified,
+                message: verified
+                    ? undefined
+                    : 'No GIR node covers this line (yet). Breakpoint activates when a node maps here.'
+            }
+        })
+        this.lineBreakpoints.set(key, entries)
+        this.respond(request, {
+            breakpoints: entries.map((e) => ({
+                id: e.id,
+                verified: e.verified,
+                line: e.line,
+                message: e.message
+            }))
+        })
+        // Sync origins both ways immediately: upgrades push newly covered origins,
+        // removals clear them at the worker.
+        this.reverifyLineBreakpoints()
+        if (!this.girIndexAttempted) {
+            this.girIndexAttempted = true
+            await this.refreshGirIndex()
+        }
+    }
+
+    private lineMapsToOrigin(key: string, oneBasedLine: number): boolean {
+        if (!this.girLineIndex) {
+            return false
+        }
+        const origins = this.girLineIndex.get(key)?.get(oneBasedLine - 1)
+        return !!origins && origins.length > 0
+    }
+
+    /** Fetch gir-json for every graph of the current run and build span indexes. */
+    private async refreshGirIndex(): Promise<void> {
+        try {
+            const query = this.taskId ? `?target=${encodeURIComponent(this.taskId)}` : ''
+            const root = (await apiGet(this.port, `/api/gir-json${query}`)) as {
+                ok?: boolean
+                graph?: GirGraphJson
+            }
+            if (!root.ok || !root.graph) {
+                this.girIndexAttempted = false // transient (worker starting); let the poll retry
+                return
+            }
+            // BFS over nested graphs: inner closures (branch arms, sync blocks) live in
+            // subgraphs of subgraphs, and their nodes carry source spans too.
+            const graphs: GirGraphJson[] = []
+            const queue: GirGraphJson[] = [root.graph]
+            const seen = new Set<string>()
+            while (queue.length > 0) {
+                const summary = queue.shift()!
+                const id = summary.id ?? ''
+                if (id && seen.has(id)) {
+                    continue
+                }
+                if (id) {
+                    seen.add(id)
+                }
+                const full = (await apiGet(
+                    this.port,
+                    `/api/gir-json${query ? `${query}&` : '?'}graphId=${encodeURIComponent(id)}`
+                )) as { ok?: boolean; graph?: GirGraphJson }
+                if (!full.ok || !full.graph) {
+                    continue
+                }
+                graphs.push(full.graph)
+                for (const child of full.graph.children ?? []) {
+                    queue.push(child)
+                }
+            }
+            const byOrigin = new Map<number, GirNodeJson & { graphName?: string }>()
+            const byFileLine = new Map<string, Map<number, number[]>>()
+            for (const graph of graphs) {
+                for (const node of graph.nodes ?? []) {
+                    if (!node.span || !node.originId) {
+                        continue
+                    }
+                    byOrigin.set(node.originId, { ...node, graphName: graph.name })
+                    const fileKey = normalizeFile(node.span.file)
+                    let lines = byFileLine.get(fileKey)
+                    if (!lines) {
+                        lines = new Map()
+                        byFileLine.set(fileKey, lines)
+                    }
+                    for (let line = node.span.startLine; line <= node.span.endLine; line++) {
+                        const origins = lines.get(line)
+                        if (origins) {
+                            origins.push(node.originId)
+                        } else {
+                            lines.set(line, [node.originId])
+                        }
+                    }
+                }
+            }
+            this.girOriginIndex = byOrigin
+            this.girLineIndex = byFileLine
+            this.reverifyLineBreakpoints()
+        } catch {
+            // gir-json unavailable yet (worker still starting / run not started);
+            // the poll loop retries because girIndexAttempted stays false.
+            this.girIndexAttempted = false
+        }
+    }
+
+    /** After the index arrives, upgrade line breakpoints, notify VSCode, and push
+     *  the newly covered origins to camel-db so execution actually pauses there. */
+    private reverifyLineBreakpoints(): void {
+        this.lineBreakpointOrigins.clear()
+        for (const [key, entries] of this.lineBreakpoints) {
+            for (const entry of entries) {
+                const verified = this.lineMapsToOrigin(key, entry.line)
+                if (verified) {
+                    const origins = this.girLineIndex?.get(key)?.get(entry.line - 1) ?? []
+                    origins.forEach((o) => this.lineBreakpointOrigins.add(o))
+                }
+                if (verified === entry.verified) {
+                    continue
+                }
+                entry.verified = verified
+                entry.message = verified
+                    ? undefined
+                    : 'No GIR node covers this line (yet). Breakpoint activates when a node maps here.'
+                this.sendEvent('breakpoint', {
+                    reason: 'changed',
+                    breakpoint: {
+                        id: entry.id,
+                        verified: entry.verified,
+                        line: entry.line,
+                        message: entry.message
+                    }
+                })
+            }
+        }
+        void this.pushNodeBreakpoints()
     }
 
     private async launch(args: CamelLaunchArguments, request: { seq?: number }): Promise<void> {
@@ -187,9 +420,13 @@ export class CamelDebugSession implements vscode.DebugAdapter {
         })
 
         await this.waitForApi()
-        await apiPost(this.port, '/api/file', { path: program })
+        const loaded = (await apiPost(this.port, '/api/file', { path: program })) as { taskId?: string }
+        this.taskId = loaded.taskId ?? ''
         await this.pushNodeBreakpoints()
-        await apiPost(this.port, '/api/run')
+        await this.pushAllLineBreakpoints()
+        await apiPost(this.port, '/api/run', this.taskId ? { target: this.taskId } : {})
+        this.runActive = true
+        this.runTerminated = false
         this.respond(request, {})
         this.startPolling()
     }
@@ -204,9 +441,36 @@ export class CamelDebugSession implements vscode.DebugAdapter {
         }
         const state = (await apiGet(this.port, '/api/state')) as CamelDbState
         this.program = state.targetFile ?? ''
+        this.taskId = state.tasks?.[0]?.id ?? ''
         await this.pushNodeBreakpoints()
+        await this.pushAllLineBreakpoints()
+        this.runActive = state.tasks?.some((t) => t.taskState === 'running' || t.taskState === 'paused') ?? false
         this.respond(request, {})
         this.startPolling()
+    }
+
+    private async pushNodeBreakpoints(): Promise<void> {
+        const originIds = [...new Set([...this.nodeBreakpointOrigins, ...this.lineBreakpointOrigins])]
+        if (originIds.length === 0 && !this.taskId) {
+            return
+        }
+        try {
+            await apiPost(this.port, '/api/gir-breakpoints', {
+                target: this.taskId,
+                originIds
+            })
+        } catch {
+            // camel-db not up yet (breakpoints are re-pushed on demand); ignore
+        }
+    }
+
+    private async pushAllLineBreakpoints(): Promise<void> {
+        if (this.lineBreakpoints.size === 0) {
+            return
+        }
+        this.girIndexAttempted = true
+        await this.refreshGirIndex()
+        this.reverifyLineBreakpoints()
     }
 
     private async waitForApi(): Promise<void> {
@@ -223,17 +487,6 @@ export class CamelDebugSession implements vscode.DebugAdapter {
             }
         }
         throw new Error(`camel-db did not start on port ${this.port} within 10s`)
-    }
-
-    private async pushNodeBreakpoints(): Promise<void> {
-        if (this.nodeBreakpointIds.size === 0) {
-            return
-        }
-        try {
-            await apiPost(this.port, '/api/gir-breakpoints', { nodeIds: [...this.nodeBreakpointIds] })
-        } catch {
-            // camel-db not up yet (breakpoints are re-pushed on demand); ignore
-        }
     }
 
     private startPolling(): void {
@@ -255,27 +508,52 @@ export class CamelDebugSession implements vscode.DebugAdapter {
         try {
             const state = (await apiGet(this.port, '/api/state')) as CamelDbState
             const tasks = state.tasks ?? []
-            const pausedTask = tasks.find((t) => t.paused)
+            const task = tasks.find((t) => (this.taskId ? t.id === this.taskId : true)) ?? tasks[0]
+            if (task && !this.taskId) {
+                this.taskId = task.id
+            }
+            const pausedTask = task?.paused ? task : undefined
+
+            // Refresh the gir-json index once a run exists but the index is still missing.
+            if (!this.girOriginIndex && this.runActive && !this.girIndexAttempted) {
+                this.girIndexAttempted = true
+                void this.refreshGirIndex()
+            }
 
             if (pausedTask && !this.wasPaused) {
                 this.wasPaused = true
-                const reason = String(pausedTask.pauseReason ?? '')
+                const pausedNode = pausedTask.pausedNode
+                if (pausedNode) {
+                    this.lastPausedGraphId = pausedNode.graphId
+                    this.lastPausedOrigin = pausedNode.origin
+                }
+                const origin = pausedNode?.origin ?? 0
+                this.onDidChangePausedNode?.(origin > 0 ? origin : null)
+                const reason = this.expectStepStop ? 'step' : 'breakpoint'
+                this.expectStepStop = false
                 this.sendEvent('stopped', {
-                    reason: /step/i.test(reason) ? 'step' : 'breakpoint',
+                    reason,
                     threadId: 1,
                     allThreadsStopped: true,
-                    text: reason
+                    text: pausedTask.pauseReason?.phase ?? (reason === 'step' ? 'step' : 'breakpoint')
                 })
             } else if (!pausedTask && this.wasPaused) {
                 this.wasPaused = false
+                this.lastPausedOrigin = 0
+                this.onDidChangePausedNode?.(null)
                 this.sendEvent('continued', { threadId: 1, allThreadsContinued: true })
             }
 
-            if (tasks.length > 0) {
-                this.hadTasks = true
-            } else if (this.hadTasks) {
-                this.hadTasks = false
-                this.sendEvent('terminated', {})
+            // Natural termination: the worker reports completed/terminated for a run we started.
+            if (task && this.runActive && !this.runTerminated) {
+                if (task.taskState === 'completed' || task.taskState === 'terminated' || task.taskState === 'exited') {
+                    this.runTerminated = true
+                    this.runActive = false
+                    this.wasPaused = false
+                    this.lastPausedOrigin = 0
+                    this.onDidChangePausedNode?.(null)
+                    this.sendEvent('terminated', {})
+                }
             }
 
             await this.streamLogs()
@@ -305,7 +583,7 @@ export class CamelDebugSession implements vscode.DebugAdapter {
     private async cleanupSession(): Promise<void> {
         this.stopPolling()
         try {
-            await apiPost(this.port, '/api/terminate')
+            await apiPost(this.port, '/api/terminate', { target: this.taskId })
         } catch {
             // ignore
         }
@@ -345,18 +623,22 @@ export class CamelDebugSession implements vscode.DebugAdapter {
 export class CamelDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory {
     private readonly sessions = new Map<string, CamelDebugSession>()
 
+    /** Fired when any session's paused node changes (for the GIR panel highlight). */
+    onDidChangePausedNode: ((origin: number | null) => void) | null = null
+
     constructor(private readonly context: vscode.ExtensionContext) {}
 
     createDebugAdapterDescriptor(session: vscode.DebugSession): vscode.ProviderResult<vscode.DebugAdapterDescriptor> {
         const adapter = new CamelDebugSession()
+        adapter.onDidChangePausedNode = (origin) => this.onDidChangePausedNode?.(origin)
         this.sessions.set(session.id, adapter)
         return new vscode.DebugAdapterInlineImplementation(adapter)
     }
 
-    /** Push GIR node breakpoints (from the GraphIR panel) into every active session. */
-    async syncNodeBreakpoints(nodeIds: string[]): Promise<void> {
+    /** Push GIR node breakpoints (origins from the GraphIR panel) into every active session. */
+    async syncNodeBreakpoints(origins: number[]): Promise<void> {
         for (const adapter of this.sessions.values()) {
-            await adapter.setNodeBreakpoints(nodeIds)
+            await adapter.setNodeBreakpoints(origins)
         }
     }
 
