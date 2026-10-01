@@ -1,0 +1,4 @@
+func main() {
+    let x = undefined_symbol();
+    print(x)
+}

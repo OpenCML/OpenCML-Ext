@@ -22,9 +22,10 @@ import {
 } from 'vscode-languageserver/node'
 
 import { TextDocument, TextEdit } from 'vscode-languageserver-textdocument'
-import * as util from 'util'
 import * as child_process from 'child_process'
 import * as path from 'path'
+import * as fs from 'fs'
+import * as crypto from 'crypto'
 import { fileURLToPath } from 'url'
 // Create a connection for the server, using Node's IPC as a transport.
 // Also include all preview / proposed LSP features.
@@ -212,187 +213,172 @@ connection.languages.diagnostics.on(async (params) => {
     }
 })
 
-interface ErrorInfo {
-    filename: string
-    line: number
-    column: number
-    message: string
+interface CamelDiagnostic {
+    range?: {
+        start: { line: number; character: number }
+        end: { line: number; character: number }
+    }
+    severity?: string
+    message?: string
+    data?: { suggestion?: string }
+}
+
+function execFileAsync(
+    command: string,
+    args: string[],
+    options: child_process.ExecFileOptions = {}
+): Promise<{ stdout: string; stderr: string }> {
+    return new Promise((resolve, reject) => {
+        child_process.execFile(
+            command,
+            args,
+            { maxBuffer: 16 * 1024 * 1024, timeout: 30000, ...options },
+            (error, stdout, stderr) => {
+                if (error) {
+                    reject(error)
+                } else {
+                    resolve({ stdout: stdout.toString(), stderr: stderr.toString() })
+                }
+            }
+        )
+    })
+}
+
+// Write buffer content to a temporary file next to the real file so that
+// relative module resolution keeps working. `camel check` requires a file
+// argument (it does not read stdin).
+function writeTempSourceFile(filePath: string, content: string): string {
+    const dir = path.dirname(filePath)
+    const ext = path.extname(filePath) || '.cml'
+    const tmp = path.join(dir, `.camel-lsp-${crypto.randomBytes(6).toString('hex')}${ext}`)
+    fs.writeFileSync(tmp, content)
+    return tmp
+}
+
+function removeFileQuietly(filePath: string | null) {
+    if (!filePath) {
+        return
+    }
+    try {
+        fs.unlinkSync(filePath)
+    } catch {
+        // ignore
+    }
+}
+
+// The formatter is a separate executable shipped next to camel:
+// camel -> camel-format, camel.exe -> camel-format.exe
+function resolveFormatterPath(camelPath: string): string {
+    const dir = path.dirname(camelPath)
+    const base = path.basename(camelPath)
+    const match = /^camel(\.exe)?$/.exec(base)
+    const fmtBase = match ? `camel-format${match[1] || ''}` : 'camel-format'
+    return dir === '.' ? fmtBase : path.join(dir, fmtBase)
+}
+
+// Parse `camel check -O json` output. Two shapes exist:
+//  - dumpAllModuleDiagnostics: a JSON array, pretty-printed with one diagnostic object per line
+//  - uncaught parse errors: a single line `Uncaught diagnostic: {json}`
+function parseCamelDiagnostics(stdout: string): CamelDiagnostic[] {
+    const out: CamelDiagnostic[] = []
+    for (const line of stdout.split('\n')) {
+        const trimmed = line.trim()
+        let jsonText = ''
+        if (trimmed.startsWith('{"range"')) {
+            jsonText = trimmed
+        } else if (trimmed.startsWith('Uncaught diagnostic:')) {
+            jsonText = trimmed.slice('Uncaught diagnostic:'.length).trim()
+        }
+        if (!jsonText) {
+            continue
+        }
+        // Sanitize: array elements carry trailing commas, and `severity` is an
+        // unquoted identifier in camel's JSON dump.
+        jsonText = jsonText
+            .replace(/,+$/, '')
+            .replace(/"severity":(Error|Warn|Info|Hint)\b/g, '"severity":"$1"')
+        try {
+            const obj = JSON.parse(jsonText) as CamelDiagnostic
+            if (obj && obj.message) {
+                out.push(obj)
+            }
+        } catch {
+            // not a diagnostic JSON line, ignore
+        }
+    }
+    return out
+}
+
+function mapSeverity(severity: string | undefined): DiagnosticSeverity {
+    switch (severity) {
+        case 'Warn':
+            return DiagnosticSeverity.Warning
+        case 'Info':
+            return DiagnosticSeverity.Information
+        case 'Hint':
+            return DiagnosticSeverity.Hint
+        default:
+            return DiagnosticSeverity.Error
+    }
 }
 
 export async function validateCode(codeText: string, filePath: string) {
+    let tmpFile: string | null = null
     try {
-        const sanitizedPath = `"${filePath.replace(/"/g, '\\"')}"`;
-
-        console.log('using camel path:', globalSettings.camelPath)
+        const camelPath = globalSettings.camelPath
+        console.log('using camel path:', camelPath)
         console.log('checking file', filePath)
-        const camelProcess = child_process.spawn(globalSettings.camelPath, [
-            'check',
-            '--syntax-only',
-            '-O',
-            'json',
-            sanitizedPath
-        ], {
-            cwd: path.dirname(filePath),
-            shell: true, // Required for Windows path resolution
-            windowsVerbatimArguments: false // Allows automatic quoting
+
+        tmpFile = writeTempSourceFile(filePath, codeText)
+        const { stdout } = await execFileAsync(camelPath, ['check', '-O', 'json', tmpFile], {
+            cwd: path.dirname(filePath)
         })
 
-        camelProcess.on('error', (error) => {
-            console.error('Error starting camel process:', error)
-        })
+        const parsed = parseCamelDiagnostics(stdout)
+        console.log(`Found ${parsed.length} issue(s) for ${filePath}`)
 
-        if (!camelProcess.pid) {
-            throw new Error('Failed to start camel process, please make sure camel is installed')
-        }
-
-        const { stdout, stderr } = await new Promise<{ stdout: string; stderr: string }>(
-            (resolve, reject) => {
-                let stdout = ''
-                let stderr = ''
-
-                camelProcess.stdout.on('data', (data) => {
-                    stdout += data.toString()
-                })
-
-                camelProcess.stderr.on('data', (data) => {
-                    stderr += data.toString()
-                })
-
-                camelProcess.on('close', (code) => {
-
-                    console.log(`[DEBUG] Exit code: ${code}`);
-                    console.log('[DEBUG] stderr output:', stderr);
-
-                    if (code !== 0) {
-                        reject(new Error(`Camel process exited with code ${code}`))
-                    } else {
-                        resolve({ stdout, stderr })
-                    }
-                })
-
-                camelProcess.stdin.write(codeText)
-                camelProcess.stdin.end()
-            }
-        )
-
-        console.log('Validation stdout:', stdout)
-        console.log('Validation stderr:', stderr)
-
-
-        const errors: ErrorInfo[] = []
-        const lines = stdout.split('\n')
-        for (const line of lines) {
-            if (line.trim() === '' || !line.startsWith('{')) {
-                continue
-            }
-            const trimmedLine = line.trim()
-            console.log('Parsing line:', trimmedLine)
-            try {
-                const sanitizedLine = trimmedLine.replace(/\\/g, '\\\\')
-                const parsedLine = JSON.parse( sanitizedLine )
-                if (
-                    typeof parsedLine.line === 'number' &&
-                    typeof parsedLine.message === 'string'
-
-                ) {
-                    errors.push({
-                        filename: parsedLine.filename || filePath,
-                        line: parsedLine.line,
-                        column: Math.max(parsedLine.column || 1, 1), // the minimum value is 1
-                        message: parsedLine.message.replace(/\s+/g, ' ') // remove all whitespace
-                    })
-                }
-            } catch (parseError) {
-                console.error('Error parsing line:', {
-                    line: trimmedLine,
-                    error: parseError
-                })
-            }
-        }
-
-        const diagnostics = errors.map((error) => {
-            const line = Math.max(0, error.line - 1)
-            const character = Math.max(0, error.column - 1)
-            return {
-                severity: DiagnosticSeverity.Error,
-                range: {
-                    start: { line, character },
-                    end: { line, character }
+        return parsed.map((d) => ({
+            severity: mapSeverity(d.severity),
+            range: {
+                start: {
+                    line: Math.max(0, d.range?.start?.line ?? 0),
+                    character: Math.max(0, d.range?.start?.character ?? 0)
                 },
-                message: error.message,
-                source: 'OpenCML'
-            }
-        })
-
-        if (diagnostics.length === 0) {
-            console.log('No issues found')
-        } else {
-            console.log(`Found ${diagnostics.length} issue(s)`)
-        }
-
-        for (const diagnostic of diagnostics) {
-            console.log(`Diagnostic: ${util.inspect(diagnostic, { depth: 10 })}`)
-        }
-
-        return diagnostics
+                end: {
+                    line: Math.max(0, d.range?.end?.line ?? 0),
+                    character: Math.max(0, d.range?.end?.character ?? 0)
+                }
+            },
+            message: d.data?.suggestion ? `${d.message} (${d.data.suggestion})` : (d.message as string),
+            source: 'Camel'
+        }))
     } catch (error) {
         console.log('Error validating code:', error)
         return []
+    } finally {
+        removeFileQuietly(tmpFile)
     }
 }
 
 export async function formatCode(codeText: string, filePath: string) {
+    let tmpFile: string | null = null
     try {
-        console.log('using camel path:', globalSettings.camelPath)
+        const formatterPath = resolveFormatterPath(globalSettings.camelPath)
+        console.log('using formatter path:', formatterPath)
         console.log('formatting file:', filePath)
-        const camelProcess = child_process.spawn(globalSettings.camelPath, ['format', filePath])
-        camelProcess.on('error', (error) => {
-            console.error('Error starting camel process:', error)
-            return codeText
+
+        tmpFile = writeTempSourceFile(filePath, codeText)
+        const { stdout } = await execFileAsync(formatterPath, [tmpFile], {
+            cwd: path.dirname(filePath)
         })
-
-        if (!camelProcess.pid) {
-            console.error('Failed to start camel process, please make sure camel is installed')
-            return codeText
-        }
-
-        const { stdout, stderr } = await new Promise<{ stdout: string; stderr: string }>(
-            (resolve, reject) => {
-                let formattedCode = ''
-                let stderr = ''
-
-                camelProcess.stdout.on('data', (data: Buffer) => {
-					formattedCode += data.toString().replace(/\r\n/g, '\n')
-                })
-                camelProcess.stderr.on('data', (data: Buffer) => {
-                    stderr += data.toString()
-                })
-
-                camelProcess.on('close', (code) => {
-					console.log(`[DEBUG] Exit code: ${code}`)
-					console.log('[DEBUG] stderr output:', stderr)
-					console.log('[DEBUG] stdout output:', formattedCode)
-					if (code !== 0) {
-						reject(new Error(`Camel process exited with code ${code}, stderr: ${stderr}`))
-					} else {
-						resolve({ stdout: formattedCode, stderr })
-					}
-                })
-
-                camelProcess.stdin.write(codeText)
-                camelProcess.stdin.end()
-            }
-        )
-		
-		if (stderr.trim() !== '') {
-			throw new Error(`Camel process exited with stderr: ${stderr}`)
-		}
 
         console.log('Formatted code:', stdout)
         return stdout
     } catch (error) {
         console.log('Error formatting code:', error)
         return codeText
+    } finally {
+        removeFileQuietly(tmpFile)
     }
 }
 

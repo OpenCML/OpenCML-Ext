@@ -1,5 +1,6 @@
 import * as path from 'path'
 import * as fs from 'fs'
+import * as child_process from 'child_process'
 import * as vscode from 'vscode'
 import {
     LanguageClient,
@@ -9,10 +10,19 @@ import {
 } from 'vscode-languageclient/node'
 
 let client: LanguageClient
+let outputChannel: vscode.OutputChannel | undefined
+let pendingDot: string | null = null
 
-function getCamelPath(): string | undefined {
+function getCamelPath(): string {
     const config = vscode.workspace.getConfiguration('opencmlLanguageServer')
-    return config.get<string>('camelPath')
+    return config.get<string>('camelPath') || 'camel'
+}
+
+function getOutputChannel(): vscode.OutputChannel {
+    if (!outputChannel) {
+        outputChannel = vscode.window.createOutputChannel('Camel')
+    }
+    return outputChannel
 }
 
 // 示例函数，展示如何使用获取到的配置项
@@ -43,6 +53,67 @@ function addWordToSpellChecker(words: string[]) {
     }
 }
 
+function execFileAsync(
+    command: string,
+    args: string[],
+    options: child_process.ExecFileOptions = {}
+): Promise<{ stdout: string; stderr: string }> {
+    return new Promise((resolve, reject) => {
+        child_process.execFile(
+            command,
+            args,
+            { maxBuffer: 16 * 1024 * 1024, timeout: 60000, ...options },
+            (error, stdout, stderr) => {
+                if (error) {
+                    reject(error)
+                } else {
+                    resolve({ stdout: stdout.toString(), stderr: stderr.toString() })
+                }
+            }
+        )
+    })
+}
+
+// Run the active file with the Camel CLI and stream output to the Camel channel.
+function runCamel() {
+    const editor = vscode.window.activeTextEditor
+    if (!editor || !['cml', 'psl'].includes(editor.document.languageId)) {
+        vscode.window.showInformationMessage('Open a CML file first, then run Camel.')
+        return
+    }
+    const filePath = editor.document.uri.fsPath
+    const camelPath = getCamelPath()
+    const channel = getOutputChannel()
+    channel.clear()
+    channel.appendLine(`> ${camelPath} ${filePath}`)
+    channel.show(true)
+    const proc = child_process.spawn(camelPath, [filePath], { cwd: path.dirname(filePath) })
+    proc.stdout.on('data', (data) => channel.append(data.toString()))
+    proc.stderr.on('data', (data) => channel.append(data.toString()))
+    proc.on('error', (error) => {
+        vscode.window.showErrorMessage(
+            `Failed to start Camel: ${error.message}. Check the "opencmlLanguageServer.camelPath" setting.`
+        )
+    })
+    proc.on('close', (code) => channel.appendLine(`\n[camel exited with code ${code}]`))
+}
+
+// Extract a Graphviz DOT graph from camel stdout (the std::rgir pass).
+function extractDot(stdout: string): string | null {
+    const match = /^\s*(?:strict\s+)?(?:di)?graph\b/m.exec(stdout)
+    if (!match) {
+        return null
+    }
+    return stdout.slice(match.index).trim()
+}
+
+async function computeGirDot(filePath: string): Promise<{ dot: string | null; output: string }> {
+    const { stdout, stderr } = await execFileAsync(getCamelPath(), [filePath, 'std::rgir'], {
+        cwd: path.dirname(filePath)
+    })
+    return { dot: extractDot(stdout), output: stderr ? `${stdout}\n${stderr}` : stdout }
+}
+
 function getWebviewContent(context: vscode.ExtensionContext, panel: vscode.WebviewPanel) {
     const htmlPath = path.join(context.extensionPath, 'dist', 'panels', 'graphviz', 'index.html')
     let html = fs.readFileSync(htmlPath, 'utf8')
@@ -54,6 +125,10 @@ function getWebviewContent(context: vscode.ExtensionContext, panel: vscode.Webvi
         const uri = panel.webview.asWebviewUri(vscode.Uri.file(absPath))
         return `${attr}="${uri}"`
     })
+
+    // Allow the bundled scripts and WebAssembly (graphviz renderer) to run in the webview.
+    const csp = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src ${panel.webview.cspSource} 'wasm-unsafe-eval'; style-src ${panel.webview.cspSource} 'unsafe-inline'; img-src ${panel.webview.cspSource} data:;">`
+    html = html.replace('</head>', `    ${csp}\n</head>`)
 
     return html
 }
@@ -71,18 +146,42 @@ export function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(
         vscode.commands.registerCommand('camel.run', () => {
-            vscode.window.showInformationMessage('Running code...')
+            runCamel()
         })
     )
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('camel.vizGIR', () => {
-            const columnToShowIn = vscode.window.activeTextEditor
-                ? vscode.window.activeTextEditor.viewColumn
-                : undefined
+        vscode.commands.registerCommand('camel.vizGIR', async () => {
+            const editor = vscode.window.activeTextEditor
+            if (!editor || editor.document.languageId !== 'cml') {
+                vscode.window.showInformationMessage('Open a CML file first, then visualize GraphIR.')
+                return
+            }
+            const filePath = editor.document.uri.fsPath
+
+            let dot: string | null = null
+            try {
+                const result = await computeGirDot(filePath)
+                dot = result.dot
+                if (!dot) {
+                    vscode.window.showWarningMessage(
+                        `Camel did not produce a GraphIR. Output:\n${result.output.trim().slice(0, 2000)}`
+                    )
+                    return
+                }
+            } catch (error) {
+                vscode.window.showErrorMessage(
+                    `Failed to run Camel: ${error}. Check the "opencmlLanguageServer.camelPath" setting.`
+                )
+                return
+            }
+
+            pendingDot = dot
+            const columnToShowIn = editor.viewColumn
 
             if (currPanel) {
                 currPanel.reveal(columnToShowIn)
+                currPanel.webview.postMessage({ command: 'render', dot: pendingDot })
             } else {
                 currPanel = vscode.window.createWebviewPanel(
                     'camel', // Identifies the type of the webview. Used internally
@@ -102,6 +201,11 @@ export function activate(context: vscode.ExtensionContext) {
                 currPanel.webview.onDidReceiveMessage(
                     (message) => {
                         switch (message.command) {
+                            case 'ready':
+                                if (pendingDot) {
+                                    currPanel?.webview.postMessage({ command: 'render', dot: pendingDot })
+                                }
+                                return
                             case 'alert':
                                 vscode.window.showErrorMessage(message.text)
                                 return
@@ -114,6 +218,7 @@ export function activate(context: vscode.ExtensionContext) {
                 currPanel.onDidDispose(
                     () => {
                         currPanel = undefined
+                        pendingDot = null
                     },
                     null,
                     context.subscriptions

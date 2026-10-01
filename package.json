@@ -2,7 +2,7 @@
     "name": "open-cml-extension",
     "displayName": "OpenCML-Ext",
     "description": "OpenCML Extension for VSCode",
-    "version": "0.6.0",
+    "version": "0.7.0",
     "publisher": "Kogler7",
     "icon": "assets/icon.jpg",
     "type": "module",
@@ -31,7 +31,7 @@
                     "scope": "resource",
                     "type": "string",
                     "default": "camel",
-                    "description": "Path to the Camel executable."
+                    "description": "Path to the Camel executable (e.g. camel or /path/to/camel.exe). The formatter is resolved as camel-format next to it."
                 },
                 "opencmlLanguageServer.maxNumberOfProblems": {
                     "scope": "resource",
