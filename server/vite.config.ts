@@ -3,23 +3,20 @@ import { defineConfig } from 'vite'
 import path from 'path'
 
 export default defineConfig({
+    ssr: {
+        noExternal: true
+    },
     build: {
         target: 'node16',
         ssr: true,
-        lib: {
-            entry: path.resolve(__dirname, 'src/server.ts'),
-            formats: ['es'],
-            fileName: () => 'server.js'
-        },
-        outDir: path.resolve(__dirname, '../dist/server'),
-        emptyOutDir: false,
+        outDir: '../dist/server',
+        emptyOutDir: true,
         rollupOptions: {
             input: path.resolve(__dirname, 'src/server.ts'),
             output: {
-                format: 'es',
-                entryFileNames: 'server.js'
-            },
-            external: ['vscode', 'path', 'fs', 'url', 'child_process', 'vscode-languageclient']
+                format: 'cjs',
+                entryFileNames: 'server.cjs'
+            }
         }
     }
 })

@@ -1,4 +1,5 @@
 import * as path from 'path'
+import * as fs from 'fs'
 import * as vscode from 'vscode'
 import {
     LanguageClient,
@@ -26,53 +27,35 @@ function showCamelPath() {
 }
 
 function addWordToSpellChecker(words: string[]) {
-    const config = vscode.workspace.getConfiguration()
-    const cSpellWords = (config.get('cSpell.words') as string[]) || []
-	console.log(cSpellWords)
+    try {
+        const config = vscode.workspace.getConfiguration()
+        const cSpellWords = (config.get('cSpell.words') as string[]) || []
+        console.log(cSpellWords)
 
-    words.forEach((word) => {
-        if (!cSpellWords.includes(word)) {
-            cSpellWords.push(word)
-        }
-    })
-    config.update('cSpell.words', cSpellWords, vscode.ConfigurationTarget.Workspace)
+        words.forEach((word) => {
+            if (!cSpellWords.includes(word)) {
+                cSpellWords.push(word)
+            }
+        })
+        config.update('cSpell.words', cSpellWords, vscode.ConfigurationTarget.Workspace)
+    } catch (error) {
+        console.warn('Failed to update cSpell.words:', error)
+    }
 }
 
-function getWebviewContent() {
-    return `<!DOCTYPE html>
-	<html lang="en">
-	<head>
-		<meta charset="UTF-8">
-		<meta name="viewport" content="width=device-width, initial-scale=1.0">
-		<title>Cat Coding</title>
-	</head>
-	<body>
-		<img src="https://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif" width="300" />
-		<h1 id="lines-of-code-counter">0</h1>
-	
-		<script>
-			const counter = document.getElementById('lines-of-code-counter');
-	
-			let count = 0;
-			setInterval(() => {
-				counter.textContent = count++;
-			}, 100);
-	
-			// Handle the message inside the webview
-			window.addEventListener('message', event => {
-	
-				const message = event.data; // The JSON data our extension sent
-	
-				switch (message.command) {
-					case 'refactor':
-						count = Math.ceil(count * 0.5);
-						counter.textContent = count;
-						break;
-				}
-			});
-		</script>
-	</body>
-	</html>`
+function getWebviewContent(context: vscode.ExtensionContext, panel: vscode.WebviewPanel) {
+    const htmlPath = path.join(context.extensionPath, 'dist', 'panels', 'graphviz', 'index.html')
+    let html = fs.readFileSync(htmlPath, 'utf8')
+
+    // Rewrite relative asset URLs (e.g. ../../assets/graphviz/xxx.js) to webview URIs
+    const distDir = path.join(context.extensionPath, 'dist')
+    html = html.replace(/(src|href)="(\.\.\/[^"]+)"/g, (_match, attr: string, relPath: string) => {
+        const absPath = path.join(distDir, relPath)
+        const uri = panel.webview.asWebviewUri(vscode.Uri.file(absPath))
+        return `${attr}="${uri}"`
+    })
+
+    return html
 }
 
 export function activate(context: vscode.ExtensionContext) {
@@ -107,16 +90,14 @@ export function activate(context: vscode.ExtensionContext) {
                     vscode.ViewColumn.Beside,
                     {
                         enableScripts: true,
-                        retainContextWhenHidden: true
+                        retainContextWhenHidden: true,
+                        localResourceRoots: [
+                            vscode.Uri.file(path.join(context.extensionPath, 'dist'))
+                        ]
                     }
                 )
 
-                const onDiskPath = vscode.Uri.joinPath(context.extensionUri, 'media', 'cat.gif')
-                const catGifSrc = currPanel.webview.asWebviewUri(onDiskPath)
-
-                currPanel.webview.postMessage({ command: 'refactor' })
-
-                currPanel.webview.html = getWebviewContent()
+                currPanel.webview.html = getWebviewContent(context, currPanel)
 
                 currPanel.webview.onDidReceiveMessage(
                     (message) => {
@@ -144,7 +125,7 @@ export function activate(context: vscode.ExtensionContext) {
     // LSP related code
 
     // The server is implemented in node
-    const serverModule = context.asAbsolutePath(path.join('server', 'server.js'))
+    const serverModule = context.asAbsolutePath(path.join('dist', 'server', 'server.cjs'))
 
     // If the extension is launched in debug mode then the debug server options are used
     // Otherwise the run options are used

@@ -32,11 +32,11 @@
             "patterns": [
                 {
                     "name": "entity.name.type.numeric.psl",
-                    "match": "\\b(int|i32|i64|float|f32|f64|string|bool|char)\\b"
+                    "match": "\\b(int|long|i32|i64|float|double|f32|f64|number)\\b"
                 },
                 {
                     "name": "entity.name.type.prime.psl",
-                    "match": "\\b(any|void|functor)\\b"
+                    "match": "\\b(string|bool|char|any|void|functor)\\b"
                 },
                 {
                     "name": "constant.language.psl",
@@ -209,7 +209,7 @@
             "patterns": [
                 {
                     "name": "support.function.io.psl",
-                    "match": "(?<=[\\w>)\\]](\\.|\\.\\.|->)(\\w+::)*)\\b[a-zA-Z_]\\w*\\b(?!::)"
+                    "match": "(?<=[\\w>)\\]](\\.\\.|->)(\\w+::)*)\\b[a-zA-Z_]\\w*\\b(?!::)"
                 },
                 {
                     "name": "support.function.io.psl",
@@ -217,7 +217,7 @@
                 },
                 {
                     "name": "support.function.io.psl",
-                    "match": "(?<!@)\\b[a-zA-Z_]\\w*(?=<[^>]*>|\\(.*\\))"
+                    "match": "\\b[a-zA-Z_]\\w*(?=<[^>]*>|\\(.*\\))"
                 }
             ]
         },

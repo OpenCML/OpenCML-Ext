@@ -32,11 +32,11 @@
             "patterns": [
                 {
                     "name": "entity.name.type.numeric.cml",
-                    "match": "\\b(int|i32|i64|float|f32|f64|string|bool|char)\\b"
+                    "match": "\\b(int|long|i32|i64|float|double|f32|f64|number)\\b"
                 },
                 {
                     "name": "entity.name.type.prime.cml",
-                    "match": "\\b(any|void|functor)\\b"
+                    "match": "\\b(string|bool|char|any|void|functor)\\b"
                 },
                 {
                     "name": "constant.language.cml",
@@ -209,7 +209,7 @@
             "patterns": [
                 {
                     "name": "support.function.io.cml",
-                    "match": "(?<=[\\w>)\\]](\\.|\\.\\.|->)(\\w+::)*)\\b[a-zA-Z_]\\w*\\b(?!::)"
+                    "match": "(?<=(?:->|\\.\\.)\\s*(?:\\w+::)*)\\b[a-zA-Z_]\\w*\\b(?!::)"
                 },
                 {
                     "name": "support.function.io.cml",
@@ -217,7 +217,7 @@
                 },
                 {
                     "name": "support.function.io.cml",
-                    "match": "(?<!@)\\b[a-zA-Z_]\\w*(?=<[^>]*>|\\(.*\\))"
+                    "match": "\\b[a-zA-Z_]\\w*(?=<[^>]*>|\\(.*\\))"
                 }
             ]
         },

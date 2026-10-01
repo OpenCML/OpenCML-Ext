@@ -1,4 +1,5 @@
 .vscode/
+.vscode-test/
 
 # 忽略所有源文件和构建配置
 **/*.ts
@@ -14,6 +15,8 @@ server/**
 webview/**
 patches/**
 
+rollup/**
+
 # 忽略构建配置和 lock 文件
 vite.config.ts
 tsconfig.json
@@ -26,6 +29,7 @@ publish.js
 # 忽略测试文件
 test/**
 __tests__/**
+scripts/**
 
 # 忽略 node_modules（尤其是 webview 里的）
 **/node_modules/**

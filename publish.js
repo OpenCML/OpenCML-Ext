@@ -23,7 +23,7 @@ const outputFileName = `OpenCML-Ext-${version}-${currentTime}.${format}`
 const outputPath = path.join(outputFolder, outputFileName)
 
 execSync("npm run build")
-execSync("vsce package --no-dependencies --out " + outputPath)
+execSync("vsce package --out " + outputPath)
 
 console.log(`Created ${outputPath}`)
 console.log("Done")
