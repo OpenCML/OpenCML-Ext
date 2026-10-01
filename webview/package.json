@@ -9,6 +9,7 @@
     },
     "dependencies": {
         "@hpcc-js/wasm": "^2.25.0",
+        "@vue-flow/core": "^1.48.2",
         "vue": "^3.5.18"
     },
     "devDependencies": {

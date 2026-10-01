@@ -12,7 +12,6 @@ import { detectToolchain, spawnHint } from './toolchain'
 
 let client: LanguageClient
 let outputChannel: vscode.OutputChannel | undefined
-let pendingDot: string | null = null
 
 function getCamelPath(): string {
     const config = vscode.workspace.getConfiguration('opencmlLanguageServer')
@@ -101,7 +100,7 @@ function runCamel() {
     proc.on('close', (code) => channel.appendLine(`\n[camel exited with code ${code}]`))
 }
 
-// Extract a Graphviz DOT graph from camel stdout (the std::rgir pass).
+// Extract a Graphviz DOT graph from camel stdout (the std::rgir family of passes).
 function extractDot(stdout: string): string | null {
     const match = /^\s*(?:strict\s+)?(?:di)?graph\b/m.exec(stdout)
     if (!match) {
@@ -110,13 +109,144 @@ function extractDot(stdout: string): string | null {
     return stdout.slice(match.index).trim()
 }
 
-async function computeGirDot(filePath: string): Promise<{ dot: string | null; output: string }> {
+async function computeGirDot(
+    filePath: string,
+    pass: string
+): Promise<{ dot: string | null; output: string }> {
     const toolchain = detectToolchain(getCamelPath())
     toolchain.warnings.forEach((w) => vscode.window.showWarningMessage(w))
-    const { stdout, stderr } = await execFileAsync(toolchain.camel, [filePath, 'std::rgir'], {
+    const { stdout, stderr } = await execFileAsync(toolchain.camel, [filePath, pass], {
         cwd: path.dirname(filePath)
     })
     return { dot: extractDot(stdout), output: stderr ? `${stdout}\n${stderr}` : stdout }
+}
+
+interface GirPanelState {
+    panel: vscode.WebviewPanel
+    fileUri: string | null
+    pass: string
+    autoRefresh: boolean
+    breakpoints: Set<string>
+    pendingDot: string | null
+}
+
+// Renders the GIR webview panel: toolbar (pass picker / auto refresh / refresh),
+// node breakpoints (double-click) which later sync to the Camel debugger.
+function registerGirPanel(context: vscode.ExtensionContext): GirPanelState {
+    const state: GirPanelState = {
+        panel: undefined as unknown as vscode.WebviewPanel,
+        fileUri: null,
+        pass: 'std::rgir',
+        autoRefresh: true,
+        breakpoints: new Set<string>(),
+        pendingDot: null
+    }
+
+    state.panel = vscode.window.createWebviewPanel(
+        'camel',
+        'GraphIR',
+        vscode.ViewColumn.Beside,
+        {
+            enableScripts: true,
+            retainContextWhenHidden: true,
+            localResourceRoots: [vscode.Uri.file(path.join(context.extensionPath, 'dist'))]
+        }
+    )
+
+    state.panel.webview.html = getWebviewContent(context, state.panel)
+
+    state.panel.webview.onDidReceiveMessage(
+        (message) => {
+            switch (message.command) {
+                case 'ready':
+                    if (state.pendingDot !== null || state.fileUri) {
+                        state.panel.webview.postMessage({
+                            command: 'render',
+                            dot: state.pendingDot,
+                            fileUri: state.fileUri ?? undefined,
+                            fileName: state.fileUri ? path.basename(state.fileUri) : undefined,
+                            pass: state.pass
+                        })
+                    }
+                    return
+                case 'refresh':
+                    if (state.fileUri) {
+                        renderForFile(state.fileUri, true)
+                    }
+                    return
+                case 'passChanged':
+                    state.pass = message.pass || 'std::rgir'
+                    if (state.fileUri) {
+                        renderForFile(state.fileUri, true)
+                    }
+                    return
+                case 'autoRefresh':
+                    state.autoRefresh = !!message.enabled
+                    return
+                case 'nodeBreakpoint': {
+                    const key = String(message.nodeKey)
+                    if (message.enabled) {
+                        state.breakpoints.add(key)
+                    } else {
+                        state.breakpoints.delete(key)
+                    }
+                    return
+                }
+                case 'alert':
+                    vscode.window.showErrorMessage(String(message.text))
+                    return
+            }
+        },
+        undefined,
+        context.subscriptions
+    )
+
+    state.panel.onDidDispose(
+        () => {
+            girState = null
+        },
+        null,
+        context.subscriptions
+    )
+
+    return state
+}
+
+let girState: GirPanelState | null = null
+
+async function showGirPanel(context: vscode.ExtensionContext) {
+    const editor = vscode.window.activeTextEditor
+    if (!editor || editor.document.languageId !== 'cml') {
+        vscode.window.showInformationMessage('Open a CML file first, then visualize GraphIR.')
+        return
+    }
+    const filePath = editor.document.uri.fsPath
+
+    if (!girState) {
+        girState = registerGirPanel(context)
+    }
+    girState.fileUri = filePath
+    girState.panel.reveal(editor.viewColumn)
+    await renderForFile(girState, filePath, true)
+}
+
+async function renderForFile(state: GirPanelState, filePath: string, errorToast: boolean) {
+    try {
+        const { dot } = await computeGirDot(filePath, state.pass)
+        state.pendingDot = dot
+        state.panel.webview.postMessage({
+            command: 'render',
+            dot,
+            fileUri: state.fileUri ?? undefined,
+            fileName: path.basename(filePath),
+            pass: state.pass,
+            error: dot ? undefined : 'Camel did not produce a GraphIR for this file.'
+        })
+    } catch (error) {
+        if (errorToast) {
+            vscode.window.showErrorMessage(`Failed to run Camel: ${error}. ${spawnHint()}`)
+        }
+    }
 }
 
 function getWebviewContent(context: vscode.ExtensionContext, panel: vscode.WebviewPanel) {
@@ -139,8 +269,6 @@ function getWebviewContent(context: vscode.ExtensionContext, panel: vscode.Webvi
 }
 
 export function activate(context: vscode.ExtensionContext) {
-    let currPanel: vscode.WebviewPanel | undefined = undefined
-
     addWordToSpellChecker(['opencml', 'opencmlrc', 'typeas'])
 
     context.subscriptions.push(
@@ -157,77 +285,18 @@ export function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(
         vscode.commands.registerCommand('camel.vizGIR', async () => {
-            const editor = vscode.window.activeTextEditor
-            if (!editor || editor.document.languageId !== 'cml') {
-                vscode.window.showInformationMessage('Open a CML file first, then visualize GraphIR.')
+            await showGirPanel(context)
+        })
+    )
+
+    // Auto-refresh the GIR panel when its tracked file is saved.
+    context.subscriptions.push(
+        vscode.workspace.onDidSaveTextDocument((document) => {
+            if (!girState || !girState.autoRefresh) {
                 return
             }
-            const filePath = editor.document.uri.fsPath
-
-            let dot: string | null = null
-            try {
-                const result = await computeGirDot(filePath)
-                dot = result.dot
-                if (!dot) {
-                    vscode.window.showWarningMessage(
-                        `Camel did not produce a GraphIR. Output:\n${result.output.trim().slice(0, 2000)}`
-                    )
-                    return
-                }
-            } catch (error) {
-                vscode.window.showErrorMessage(
-                    `Failed to run Camel: ${error}. ${spawnHint()}`
-                )
-                return
-            }
-
-            pendingDot = dot
-            const columnToShowIn = editor.viewColumn
-
-            if (currPanel) {
-                currPanel.reveal(columnToShowIn)
-                currPanel.webview.postMessage({ command: 'render', dot: pendingDot })
-            } else {
-                currPanel = vscode.window.createWebviewPanel(
-                    'camel', // Identifies the type of the webview. Used internally
-                    'GraphIR', // Title of the panel displayed to the user
-                    vscode.ViewColumn.Beside,
-                    {
-                        enableScripts: true,
-                        retainContextWhenHidden: true,
-                        localResourceRoots: [
-                            vscode.Uri.file(path.join(context.extensionPath, 'dist'))
-                        ]
-                    }
-                )
-
-                currPanel.webview.html = getWebviewContent(context, currPanel)
-
-                currPanel.webview.onDidReceiveMessage(
-                    (message) => {
-                        switch (message.command) {
-                            case 'ready':
-                                if (pendingDot) {
-                                    currPanel?.webview.postMessage({ command: 'render', dot: pendingDot })
-                                }
-                                return
-                            case 'alert':
-                                vscode.window.showErrorMessage(message.text)
-                                return
-                        }
-                    },
-                    undefined,
-                    context.subscriptions
-                )
-
-                currPanel.onDidDispose(
-                    () => {
-                        currPanel = undefined
-                        pendingDot = null
-                    },
-                    null,
-                    context.subscriptions
-                )
+            if (girState.fileUri && document.uri.fsPath === girState.fileUri) {
+                renderForFile(girState, document.uri.fsPath, false)
             }
         })
     )
