@@ -31,7 +31,19 @@
                     "scope": "resource",
                     "type": "string",
                     "default": "camel",
-                    "description": "Path to the Camel executable (e.g. camel or /path/to/camel.exe). The formatter is resolved as camel-format next to it."
+                    "description": "Path to the Camel executable (e.g. camel or /path/to/camel.exe). Sibling tools (camel-ls, camel-format, camel-db) are auto-detected next to it."
+                },
+                "opencmlLanguageServer.camelDbPath": {
+                    "scope": "resource",
+                    "type": "string",
+                    "default": "",
+                    "description": "Path to the Camel debugger executable (camel-db). Empty: resolved next to the Camel executable."
+                },
+                "opencmlLanguageServer.debugPort": {
+                    "scope": "resource",
+                    "type": "number",
+                    "default": 8765,
+                    "description": "TCP port used to talk to the Camel debugger (camel-db serve)."
                 },
                 "opencmlLanguageServer.maxNumberOfProblems": {
                     "scope": "resource",

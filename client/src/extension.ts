@@ -8,6 +8,7 @@ import {
     ServerOptions,
     TransportKind
 } from 'vscode-languageclient/node'
+import { detectToolchain, spawnHint } from './toolchain'
 
 let client: LanguageClient
 let outputChannel: vscode.OutputChannel | undefined
@@ -82,17 +83,19 @@ function runCamel() {
         return
     }
     const filePath = editor.document.uri.fsPath
-    const camelPath = getCamelPath()
+    const toolchain = detectToolchain(getCamelPath())
+    toolchain.warnings.forEach((w) => vscode.window.showWarningMessage(w))
+
     const channel = getOutputChannel()
     channel.clear()
-    channel.appendLine(`> ${camelPath} ${filePath}`)
+    channel.appendLine(`> ${toolchain.camel} ${filePath}`)
     channel.show(true)
-    const proc = child_process.spawn(camelPath, [filePath], { cwd: path.dirname(filePath) })
+    const proc = child_process.spawn(toolchain.camel, [filePath], { cwd: path.dirname(filePath) })
     proc.stdout.on('data', (data) => channel.append(data.toString()))
     proc.stderr.on('data', (data) => channel.append(data.toString()))
     proc.on('error', (error) => {
         vscode.window.showErrorMessage(
-            `Failed to start Camel: ${error.message}. Check the "opencmlLanguageServer.camelPath" setting.`
+            `Failed to start Camel: ${error.message}. ${spawnHint()}`
         )
     })
     proc.on('close', (code) => channel.appendLine(`\n[camel exited with code ${code}]`))
@@ -108,7 +111,9 @@ function extractDot(stdout: string): string | null {
 }
 
 async function computeGirDot(filePath: string): Promise<{ dot: string | null; output: string }> {
-    const { stdout, stderr } = await execFileAsync(getCamelPath(), [filePath, 'std::rgir'], {
+    const toolchain = detectToolchain(getCamelPath())
+    toolchain.warnings.forEach((w) => vscode.window.showWarningMessage(w))
+    const { stdout, stderr } = await execFileAsync(toolchain.camel, [filePath, 'std::rgir'], {
         cwd: path.dirname(filePath)
     })
     return { dot: extractDot(stdout), output: stderr ? `${stdout}\n${stderr}` : stdout }
@@ -171,7 +176,7 @@ export function activate(context: vscode.ExtensionContext) {
                 }
             } catch (error) {
                 vscode.window.showErrorMessage(
-                    `Failed to run Camel: ${error}. Check the "opencmlLanguageServer.camelPath" setting.`
+                    `Failed to run Camel: ${error}. ${spawnHint()}`
                 )
                 return
             }
