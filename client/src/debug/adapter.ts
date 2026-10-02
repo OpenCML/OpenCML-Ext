@@ -110,14 +110,20 @@ export class CamelDebugSession implements vscode.DebugAdapter {
     /** Fired when the gir-json span index refreshed (run started/restarted). */
     onDidRefreshGirIndex: (() => void) | null = null
 
+    private queue: Promise<void> = Promise.resolve()
+
     handleMessage(message: unknown): void {
         const request = message as { seq?: number; command?: string; arguments?: any }
         if (!request?.command) {
             return
         }
-        void this.dispatch(request).catch((error) => {
-            this.respond(request, undefined, false, String(error))
-        })
+        // Serialize dispatch: DAP clients rely on requests taking effect in send
+        // order (e.g. setBreakpoints must reach camel-db before a continue).
+        this.queue = this.queue
+            .then(() => this.dispatch(request))
+            .catch((error) => {
+                this.respond(request, undefined, false, String(error))
+            })
     }
 
     dispose(): void {
@@ -270,6 +276,11 @@ export class CamelDebugSession implements vscode.DebugAdapter {
             }
         })
         this.lineBreakpoints.set(key, entries)
+        // Sync origins both ways immediately: upgrades push newly covered origins,
+        // removals clear them at the worker. The push must complete before we
+        // respond: a client that awaits setBreakpoints and then sends `continue`
+        // relies on the worker having the new origin set already.
+        await this.reverifyLineBreakpoints()
         this.respond(request, {
             breakpoints: entries.map((e) => ({
                 id: e.id,
@@ -278,9 +289,6 @@ export class CamelDebugSession implements vscode.DebugAdapter {
                 message: e.message
             }))
         })
-        // Sync origins both ways immediately: upgrades push newly covered origins,
-        // removals clear them at the worker.
-        this.reverifyLineBreakpoints()
         if (!this.girIndexAttempted) {
             this.girIndexAttempted = true
             await this.refreshGirIndex()
@@ -359,7 +367,7 @@ export class CamelDebugSession implements vscode.DebugAdapter {
             }
             this.girOriginIndex = byOrigin
             this.girLineIndex = byFileLine
-            this.reverifyLineBreakpoints()
+            void this.reverifyLineBreakpoints()
             this.onDidRefreshGirIndex?.()
         } catch {
             // gir-json unavailable yet (worker still starting / run not started);
@@ -370,7 +378,7 @@ export class CamelDebugSession implements vscode.DebugAdapter {
 
     /** After the index arrives, upgrade line breakpoints, notify VSCode, and push
      *  the newly covered origins to camel-db so execution actually pauses there. */
-    private reverifyLineBreakpoints(): void {
+    private reverifyLineBreakpoints(): Promise<void> {
         this.lineBreakpointOrigins.clear()
         for (const [key, entries] of this.lineBreakpoints) {
             for (const entry of entries) {
@@ -397,7 +405,7 @@ export class CamelDebugSession implements vscode.DebugAdapter {
                 })
             }
         }
-        void this.pushNodeBreakpoints()
+        return this.pushNodeBreakpoints()
     }
 
     private async launch(args: CamelLaunchArguments, request: { seq?: number }): Promise<void> {
