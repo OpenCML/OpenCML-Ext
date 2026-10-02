@@ -202,6 +202,60 @@ function run(testsRoot, callback) {
         assert(stepped, 'step over did not pause at the next node')
         console.log('DEBUG_STEP_OK')
 
+        // Per-pass GIR snapshots: camel-db dumps the compile as entry GIR +
+        // one graph per pass. Requires a camel-db with /api/pass-graphs;
+        // older builds 404 — degrade to SKIP instead of failing.
+        try {
+            const dbState = await fetch('http://127.0.0.1:18799/api/state').then((r) => r.json())
+            const targetId = dbState?.tasks?.[0]?.id
+            const graphsRes = targetId
+                ? await fetch(`http://127.0.0.1:18799/api/pass-graphs?target=${encodeURIComponent(targetId)}`)
+                : null
+            if (!targetId || !graphsRes || !graphsRes.ok) {
+                console.log('PASS_GRAPH_SKIP: camel-db has no pass snapshots')
+            } else {
+                const graphs = (await graphsRes.json())?.graphs ?? []
+                if (!Array.isArray(graphs) || graphs.length === 0) {
+                    console.log('PASS_GRAPH_SKIP: camel-db has no pass snapshots')
+                } else {
+                    assert(
+                        graphs[0].pass === null,
+                        `first pass snapshot should be the entry GIR: ${JSON.stringify(graphs[0])}`
+                    )
+                    const fetchGraph = async (index) => {
+                        const r = await fetch(
+                            `http://127.0.0.1:18799/api/pass-graph?target=${encodeURIComponent(targetId)}&index=${index}`
+                        )
+                        if (!r.ok) {
+                            throw new Error(`pass-graph ${index} -> ${r.status}`)
+                        }
+                        return r.json()
+                    }
+                    const last = graphs[graphs.length - 1]
+                    const lastDot = (await fetchGraph(last.index))?.dot ?? ''
+                    assert(
+                        typeof lastDot === 'string' && lastDot.includes('digraph'),
+                        `last pass snapshot is not a DOT digraph: ${JSON.stringify(last)}`
+                    )
+                    let originDot = lastDot.includes('origin=')
+                    for (const g of graphs) {
+                        if (originDot) break
+                        originDot = ((await fetchGraph(g.index))?.dot ?? '').includes('origin=')
+                    }
+                    assert(originDot, 'no pass snapshot DOT carries origin= attributes')
+                    console.log(
+                        'PASS_GRAPH_OK:',
+                        graphs.length,
+                        'snapshots; last =',
+                        last.pass ?? '(entry)',
+                        '; entry pass null; origin= present'
+                    )
+                }
+            }
+        } catch (e) {
+            console.log('PASS_GRAPH_SKIP: camel-db has no pass snapshots —', String(e))
+        }
+
         // The line-6 breakpoint still fires on every recursive call: clear it so
         // continue can run to completion.
         await session.customRequest('setBreakpoints', {

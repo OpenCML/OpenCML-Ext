@@ -107,6 +107,9 @@ export class CamelDebugSession implements vscode.DebugAdapter {
     /** Fired whenever the paused node changes; used to highlight the GIR panel. */
     onDidChangePausedNode: ((origin: number | null) => void) | null = null
 
+    /** Fired when the gir-json span index refreshed (run started/restarted). */
+    onDidRefreshGirIndex: (() => void) | null = null
+
     handleMessage(message: unknown): void {
         const request = message as { seq?: number; command?: string; arguments?: any }
         if (!request?.command) {
@@ -129,6 +132,11 @@ export class CamelDebugSession implements vscode.DebugAdapter {
         this.nodeBreakpointOrigins.clear()
         origins.forEach((o) => this.nodeBreakpointOrigins.add(o))
         await this.pushNodeBreakpoints()
+    }
+
+    /** camel-db port + task id of this session (for panel-side HTTP queries). */
+    debugTarget(): { port: number; target: string } | null {
+        return this.taskId ? { port: this.port, target: this.taskId } : null
     }
 
     private async dispatch(request: { seq?: number; command?: string; arguments?: any }): Promise<void> {
@@ -352,6 +360,7 @@ export class CamelDebugSession implements vscode.DebugAdapter {
             this.girOriginIndex = byOrigin
             this.girLineIndex = byFileLine
             this.reverifyLineBreakpoints()
+            this.onDidRefreshGirIndex?.()
         } catch {
             // gir-json unavailable yet (worker still starting / run not started);
             // the poll loop retries because girIndexAttempted stays false.
@@ -626,13 +635,28 @@ export class CamelDebugAdapterFactory implements vscode.DebugAdapterDescriptorFa
     /** Fired when any session's paused node changes (for the GIR panel highlight). */
     onDidChangePausedNode: ((origin: number | null) => void) | null = null
 
+    /** Fired when any session refreshes its gir-json index (run started/restarted). */
+    onDidRefreshGirIndex: (() => void) | null = null
+
     constructor(private readonly context: vscode.ExtensionContext) {}
 
     createDebugAdapterDescriptor(session: vscode.DebugSession): vscode.ProviderResult<vscode.DebugAdapterDescriptor> {
         const adapter = new CamelDebugSession()
         adapter.onDidChangePausedNode = (origin) => this.onDidChangePausedNode?.(origin)
+        adapter.onDidRefreshGirIndex = () => this.onDidRefreshGirIndex?.()
         this.sessions.set(session.id, adapter)
         return new vscode.DebugAdapterInlineImplementation(adapter)
+    }
+
+    /** camel-db port + task id of the first session that has a task (panel queries). */
+    currentTarget(): { port: number; target: string } | null {
+        for (const adapter of this.sessions.values()) {
+            const target = adapter.debugTarget()
+            if (target) {
+                return target
+            }
+        }
+        return null
     }
 
     /** Push GIR node breakpoints (origins from the GraphIR panel) into every active session. */

@@ -4,6 +4,19 @@ All notable changes to the "OpenCML-Ext" extension will be documented in this fi
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
+## [1.2.0] - 2026-10-02
+
+The GraphIR panel can now step through the compilation itself: while a debug session is active, `camel-db` serves the GIR snapshots taken before and after each compiler pass, and a new stage dropdown in the panel switches the view between them.
+
+### Added
+
+- **Per-pass snapshot views in the GraphIR panel**: a stage dropdown (`原始 GIR（当前行为）` / `入口 GIR（passes 前）` / `N. <pass 名>`) lists the snapshots of the current run's compile, fetched from the new camel-db endpoints `GET /api/pass-graphs` and `GET /api/pass-graph?index=N`. Selecting one renders its DOT through the existing layout pipeline; node breakpoints, pause highlight, and jump-to-source keep working because snapshot nodes carry the same `origin` / `span` / `srcfile` attributes.
+- The snapshot list refreshes automatically when a run starts or restarts (hooked to the same gir-json refresh point as line-breakpoint verification), and the E2E suite validates the new endpoints when a supporting camel-db is present (`PASS_GRAPH_OK`, otherwise `PASS_GRAPH_SKIP`).
+
+### Changed
+
+- Older camel-db builds without `/api/pass-graphs` (404) degrade gracefully: the dropdown simply shows only `原始 GIR`.
+
 ## [1.1.0] - 2026-10-02
 
 Node-level debugging becomes real: breakpoints hit, stepping works, and the editor, the GraphIR panel, and the debugger all speak the same node identity (the GIR node origin).

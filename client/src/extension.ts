@@ -10,6 +10,7 @@ import {
 } from 'vscode-languageclient/node'
 import { detectToolchain, spawnHint } from './toolchain'
 import { CamelDebugAdapterFactory } from './debug/adapter'
+import { apiGet } from './debug/http'
 
 let client: LanguageClient
 let outputChannel: vscode.OutputChannel | undefined
@@ -171,6 +172,7 @@ function registerGirPanel(context: vscode.ExtensionContext): GirPanelState {
                             pass: state.pass
                         })
                     }
+                    void pushPassGraphs()
                     return
                 case 'refresh':
                     if (state.fileUri) {
@@ -185,6 +187,12 @@ function registerGirPanel(context: vscode.ExtensionContext): GirPanelState {
                     return
                 case 'autoRefresh':
                     state.autoRefresh = !!message.enabled
+                    return
+                case 'passGraphsList':
+                    void pushPassGraphs(message.target)
+                    return
+                case 'passGraph':
+                    void pushPassGraph(message.index, message.target)
                     return
                 case 'nodeBreakpoint': {
                     const key = String(message.nodeKey)
@@ -245,6 +253,77 @@ let girState: GirPanelState | null = null
 function syncPanelBreakpoints(state: GirPanelState) {
     const origins = [...state.breakpoints.values()].filter((o): o is number => o !== null && o > 0)
     void debugFactory?.syncNodeBreakpoints(origins)
+}
+
+interface PassGraphEntry {
+    index: number
+    pass: string | null
+}
+
+/** Port camel-db is expected on (individual debug sessions may override it). */
+function getDebugPort(): number {
+    return vscode.workspace.getConfiguration('opencmlLanguageServer').get<number>('debugPort') ?? 8765
+}
+
+/** Resolve which camel-db task the pass-snapshot queries address (panel-provided target wins). */
+function resolvePassGraphTarget(explicit?: unknown): { port: number; target: string } | null {
+    const sessionTarget = debugFactory?.currentTarget() ?? null
+    if (typeof explicit === 'string' && explicit.trim()) {
+        return { port: sessionTarget?.port ?? getDebugPort(), target: explicit.trim() }
+    }
+    return sessionTarget
+}
+
+/** GET /api/pass-graphs; empty list on old camel-db (404) or any transient failure. */
+async function fetchPassGraphs(explicit?: unknown): Promise<PassGraphEntry[]> {
+    const t = resolvePassGraphTarget(explicit)
+    if (!t) {
+        return []
+    }
+    try {
+        const data = (await apiGet(
+            t.port,
+            `/api/pass-graphs?target=${encodeURIComponent(t.target)}`
+        )) as { graphs?: { index?: unknown; pass?: unknown }[] }
+        if (!Array.isArray(data?.graphs)) {
+            return []
+        }
+        return data.graphs
+            .filter((g) => g && Number.isInteger(g.index))
+            .map((g) => ({ index: Number(g.index), pass: typeof g.pass === 'string' ? g.pass : null }))
+    } catch {
+        return []
+    }
+}
+
+/** Push the per-pass snapshot list to the panel (empty when camel-db has none). */
+async function pushPassGraphs(explicit?: unknown): Promise<void> {
+    const graphs = await fetchPassGraphs(explicit)
+    girState?.panel.webview.postMessage({ command: 'passGraphs', graphs })
+}
+
+/** GET /api/pass-graph and push one snapshot's DOT to the panel. */
+async function pushPassGraph(index: unknown, explicit?: unknown): Promise<void> {
+    const i = Number(index)
+    const t = resolvePassGraphTarget(explicit)
+    if (!t || !Number.isInteger(i)) {
+        girState?.panel.webview.postMessage({ command: 'passGraph', index: i, pass: null, dot: null, error: 'no debug target' })
+        return
+    }
+    try {
+        const data = (await apiGet(
+            t.port,
+            `/api/pass-graph?target=${encodeURIComponent(t.target)}&index=${i}`
+        )) as { index?: unknown; pass?: unknown; dot?: unknown }
+        girState?.panel.webview.postMessage({
+            command: 'passGraph',
+            index: Number.isInteger(data?.index) ? Number(data.index) : i,
+            pass: typeof data?.pass === 'string' ? data.pass : null,
+            dot: typeof data?.dot === 'string' ? data.dot : null
+        })
+    } catch (error) {
+        girState?.panel.webview.postMessage({ command: 'passGraph', index: i, pass: null, dot: null, error: String(error) })
+    }
 }
 
 async function showGirPanel(context: vscode.ExtensionContext) {
@@ -338,6 +417,9 @@ export function activate(context: vscode.ExtensionContext) {
     debugFactory = new CamelDebugAdapterFactory(context)
     debugFactory.onDidChangePausedNode = (origin) => {
         girState?.panel.webview.postMessage({ command: 'pausedOrigin', origin })
+    }
+    debugFactory.onDidRefreshGirIndex = () => {
+        void pushPassGraphs()
     }
     context.subscriptions.push(
         vscode.debug.registerDebugAdapterDescriptorFactory('camel', debugFactory)

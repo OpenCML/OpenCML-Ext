@@ -19,6 +19,7 @@ A Camel toolchain build (`camel.exe`, `camel-ls.exe`, `camel-format.exe`, `camel
 
 - pan / zoom / node selection with attribute inspection
 - pass picker: `std::rgir` (compact), `std::agir` (role-annotated), `std::gir` (styled)
+- **per-pass compile snapshots**: while a debug session is active, a stage dropdown lists the GIR captured before and after each compiler pass (served by `camel-db`); node breakpoints, pause highlight and jump-to-source work in snapshot views too
 - auto-refresh on save
 - **double-click a node to set a node breakpoint** (used by the debugger)
 - nested subgraphs (functions/closures) rendered as clusters; layout computed by Graphviz

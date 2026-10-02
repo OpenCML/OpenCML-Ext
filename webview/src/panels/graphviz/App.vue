@@ -19,6 +19,19 @@ interface RenderMessage {
     error?: string
 }
 
+interface PassGraphEntry {
+    index: number
+    pass: string | null
+}
+
+interface PassGraphMessage {
+    command: 'passGraph'
+    index: number
+    pass: string | null
+    dot: string | null
+    error?: string
+}
+
 const nodeTypes: NodeTypesObject = {
     gir: GirNode as unknown as NodeTypesObject[string],
     cluster: GirCluster as unknown as NodeTypesObject[string]
@@ -34,6 +47,9 @@ const selectedNode = ref<FlowNode['data'] & { id: string } | null>(null)
 const useSvgFallback = ref(false)
 const svgContainer = ref<HTMLElement | null>(null)
 const pausedOrigin = ref(0)
+// Per-compile-pass snapshots served by camel-db; null selection = original GIR.
+const snapshots = ref<PassGraphEntry[]>([])
+const snapshotSel = ref<number | null>(null)
 
 const breakpoints = new Set<string>()
 
@@ -175,18 +191,66 @@ function revealSelectedSource() {
 }
 
 function refresh() {
+    if (snapshotSel.value !== null) {
+        vscode.postMessage({ command: 'passGraph', index: snapshotSel.value })
+        return
+    }
     vscode.postMessage({ command: 'refresh', pass: pass.value })
 }
 
 function changePass() {
+    snapshotSel.value = null
     vscode.postMessage({ command: 'passChanged', pass: pass.value })
+}
+
+function changeSnapshot() {
+    if (snapshotSel.value === null) {
+        // Back to the original GIR view.
+        vscode.postMessage({ command: 'refresh' })
+        return
+    }
+    status.value = '加载 pass 快照…'
+    vscode.postMessage({ command: 'passGraph', index: snapshotSel.value })
+}
+
+function onPassGraph(message: PassGraphMessage) {
+    // Ignore stale replies after the user switched to another snapshot.
+    if (Number.isInteger(message.index) && message.index !== snapshotSel.value) {
+        return
+    }
+    if (!message.dot) {
+        status.value = `无法加载 pass 快照${message.error ? `：${message.error}` : ''}`
+        return
+    }
+    void renderDotMessage({
+        command: 'render',
+        dot: message.dot,
+        fileName: fileName.value,
+        pass: message.pass ?? undefined
+    })
 }
 
 function onMessage(event: MessageEvent) {
     const message = event.data
     if (!message || typeof message !== 'object') return
     if (message.command === 'render') {
+        // Any extension-pushed render is the original GIR view; leave snapshot mode.
+        snapshotSel.value = null
         renderDotMessage(message as RenderMessage)
+    } else if (message.command === 'passGraphs') {
+        const raw: unknown[] = Array.isArray(message.graphs) ? message.graphs : []
+        const list: PassGraphEntry[] = raw
+            .filter((g): g is PassGraphEntry => !!g && Number.isInteger((g as PassGraphEntry).index))
+            .map((g) => ({ index: Number(g.index), pass: typeof g.pass === 'string' ? g.pass : null }))
+            .sort((a, b) => a.index - b.index)
+        snapshots.value = list
+        if (snapshotSel.value !== null && !list.some((g) => g.index === snapshotSel.value)) {
+            snapshotSel.value = null
+            // The selected snapshot vanished (e.g. recompiled): back to the original view.
+            vscode.postMessage({ command: 'refresh' })
+        }
+    } else if (message.command === 'passGraph') {
+        onPassGraph(message as PassGraphMessage)
     } else if (message.command === 'pausedOrigin') {
         pausedOrigin.value = typeof message.origin === 'number' ? message.origin : 0
         nodes.value = decorate(nodes.value)
@@ -212,6 +276,7 @@ onMounted(async () => {
         status.value = `Graphviz 加载失败: ${error}`
     }
     vscode.postMessage({ command: 'ready' })
+    vscode.postMessage({ command: 'passGraphsList' })
 })
 
 onUnmounted(() => {
@@ -224,10 +289,16 @@ onUnmounted(() => {
         <div class="toolbar">
             <span class="title">GraphIR</span>
             <span class="file">{{ fileName }}</span>
-            <select v-model="pass" @change="changePass" title="GIR pass">
+            <select v-model="pass" @change="changePass" title="GIR pass" :disabled="snapshotSel !== null">
                 <option value="std::rgir">rgir（精简）</option>
                 <option value="std::agir">agir（角色标注）</option>
                 <option value="std::gir">gir（完整样式）</option>
+            </select>
+            <select v-model="snapshotSel" @change="changeSnapshot" title="编译 pass 快照（需调试会话）">
+                <option :value="null">原始 GIR（当前行为）</option>
+                <option v-for="g in snapshots" :key="g.index" :value="g.index">
+                    {{ g.pass === null ? '入口 GIR（passes 前）' : `${g.index}. ${g.pass}` }}
+                </option>
             </select>
             <label class="auto">
                 <input type="checkbox" v-model="autoRefresh" @change="vscode.postMessage({ command: 'autoRefresh', enabled: autoRefresh })" />
