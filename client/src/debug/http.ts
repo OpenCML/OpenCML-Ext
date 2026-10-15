@@ -1,5 +1,10 @@
+import { t } from '../localization'
 // Minimal JSON HTTP client for the camel-db API (127.0.0.1 only).
 import * as http from 'http'
+
+export class DebugHttpError extends Error {
+    constructor(public readonly status: number, public readonly endpoint: string, message: string) { super(message) }
+}
 
 function request(port: number, method: string, path: string, body?: unknown, timeoutMs = 3000): Promise<unknown> {
     return new Promise((resolve, reject) => {
@@ -21,7 +26,10 @@ function request(port: number, method: string, path: string, body?: unknown, tim
                 res.on('end', () => {
                     const text = Buffer.concat(chunks).toString()
                     if (res.statusCode && res.statusCode >= 400) {
-                        reject(new Error(`camel-db ${method} ${path} -> ${res.statusCode}: ${text.slice(0, 200)}`))
+                        reject(new DebugHttpError(res.statusCode, path,
+                            res.statusCode === 404 || res.statusCode === 405
+                                ? t('This camel-db does not support {0}. Update the debugger from the same Camel build.', path.split('?')[0])
+                                : `camel-db ${method} ${path} -> ${res.statusCode}: ${text.slice(0, 200)}`))
                         return
                     }
                     try {
@@ -32,7 +40,7 @@ function request(port: number, method: string, path: string, body?: unknown, tim
                 })
             }
         )
-        req.on('timeout', () => req.destroy(new Error(`timeout calling camel-db ${method} ${path}`)))
+        req.on('timeout', () => req.destroy(new Error(t("timeout calling camel-db {0} {1}", method, path))))
         req.on('error', reject)
         if (data) {
             req.write(data)

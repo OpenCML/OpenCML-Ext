@@ -1,20 +1,37 @@
+import { t, setLocale } from './localization'
 import * as path from 'path'
 import * as fs from 'fs'
 import * as child_process from 'child_process'
+import { randomUUID } from 'crypto'
 import * as vscode from 'vscode'
 import {
     LanguageClient,
     LanguageClientOptions,
     ServerOptions,
-    TransportKind
+    TransportKind,
+    State,
+    vsdiag,
+    InlayHintRequest
 } from 'vscode-languageclient/node'
 import { detectToolchain, spawnHint } from './toolchain'
+import { presentDiagnostics, registerDiagnosticAdvice } from './diagnosticAdvice'
+import { RuntimeStatus, inspectRuntime } from './runtimeStatus'
 import { CamelDebugAdapterFactory } from './debug/adapter'
-import { apiGet } from './debug/http'
+import { mapGirSources } from './girSource'
+import { apiGet, DebugHttpError } from './debug/http'
+import { inspectCompatibility, languageFeatures } from './compatibility'
 
-let client: LanguageClient
+let client: LanguageClient | undefined
+setLocale(vscode.env.language)
+let languageServerQueue: Promise<void> = Promise.resolve()
+let deactivating = false
 let outputChannel: vscode.OutputChannel | undefined
 let debugFactory: CamelDebugAdapterFactory | undefined
+let runtimeStatus: RuntimeStatus
+let diagnosticCloseListener: vscode.Disposable | undefined
+let sourceWatcher: vscode.FileSystemWatcher | undefined
+let serverStateListener: vscode.Disposable | undefined
+let runInProgress = false
 
 function getCamelPath(): string {
     const config = vscode.workspace.getConfiguration('opencmlLanguageServer')
@@ -28,34 +45,6 @@ function getOutputChannel(): vscode.OutputChannel {
     return outputChannel
 }
 
-// 示例函数，展示如何使用获取到的配置项
-function showCamelPath() {
-    const softwarePath = getCamelPath()
-
-    if (softwarePath) {
-        vscode.window.showInformationMessage(`Camel Path: ${softwarePath}`)
-    } else {
-        vscode.window.showWarningMessage('Camel Path is not set.')
-    }
-}
-
-function addWordToSpellChecker(words: string[]) {
-    try {
-        const config = vscode.workspace.getConfiguration()
-        const cSpellWords = (config.get('cSpell.words') as string[]) || []
-        console.log(cSpellWords)
-
-        words.forEach((word) => {
-            if (!cSpellWords.includes(word)) {
-                cSpellWords.push(word)
-            }
-        })
-        config.update('cSpell.words', cSpellWords, vscode.ConfigurationTarget.Workspace)
-    } catch (error) {
-        console.warn('Failed to update cSpell.words:', error)
-    }
-}
-
 function execFileAsync(
     command: string,
     args: string[],
@@ -65,7 +54,7 @@ function execFileAsync(
         child_process.execFile(
             command,
             args,
-            { maxBuffer: 16 * 1024 * 1024, timeout: 60000, ...options },
+            { maxBuffer: 16 * 1024 * 1024, timeout: vscode.workspace.getConfiguration('opencmlLanguageServer').get<number>('runtime.checkTimeoutMs', 60000), ...options },
             (error, stdout, stderr) => {
                 if (error) {
                     reject(error)
@@ -78,29 +67,68 @@ function execFileAsync(
 }
 
 // Run the active file with the Camel CLI and stream output to the Camel channel.
-function runCamel() {
-    const editor = vscode.window.activeTextEditor
-    if (!editor || !['cml', 'psl'].includes(editor.document.languageId)) {
-        vscode.window.showInformationMessage('Open a CML file first, then run Camel.')
+async function runCamel(): Promise<number | undefined> {
+    if (runInProgress) {
+        getOutputChannel().show(true)
         return
     }
-    const filePath = editor.document.uri.fsPath
-    const toolchain = detectToolchain(getCamelPath())
-    toolchain.warnings.forEach((w) => vscode.window.showWarningMessage(w))
-
+    const editor = vscode.window.activeTextEditor
+    if (!editor || !['cml', 'psl'].includes(editor.document.languageId)) {
+        vscode.window.showInformationMessage(t("Open a CML file first, then run Camel."))
+        return
+    }
+    if (editor.document.uri.scheme !== 'file') {
+        void vscode.window.showInformationMessage(t("Save the file as .cml before running Camel."))
+        await vscode.commands.executeCommand('workbench.action.files.save')
+        return
+    }
+    const document = editor.document
+    const folder = vscode.workspace.getWorkspaceFolder(document.uri)
+    const filePath = document.uri.fsPath
     const channel = getOutputChannel()
-    channel.clear()
-    channel.appendLine(`> ${toolchain.camel} ${filePath}`)
-    channel.show(true)
-    const proc = child_process.spawn(toolchain.camel, [filePath], { cwd: path.dirname(filePath) })
-    proc.stdout.on('data', (data) => channel.append(data.toString()))
-    proc.stderr.on('data', (data) => channel.append(data.toString()))
-    proc.on('error', (error) => {
-        vscode.window.showErrorMessage(
-            `Failed to start Camel: ${error.message}. ${spawnHint()}`
-        )
-    })
-    proc.on('close', (code) => channel.appendLine(`\n[camel exited with code ${code}]`))
+    runInProgress = true
+    try {
+        // Save the current source and other open Camel buffers in its workspace:
+        // imported modules must not silently run an older on-disk version.
+        const dirty = vscode.workspace.textDocuments.filter(doc => doc.isDirty && doc.uri.scheme === 'file' &&
+            ['cml', 'psl'].includes(doc.languageId) && (doc === document || (folder &&
+                vscode.workspace.getWorkspaceFolder(doc.uri)?.uri.toString() === folder.uri.toString())))
+        for (const doc of dirty) {
+            if (!await doc.save() || doc.isDirty) {
+                void vscode.window.showErrorMessage(t("Could not save {0}. Run cancelled.", doc.uri.fsPath))
+                return
+            }
+        }
+        if (dirty.some(doc => doc.isDirty)) {
+            void vscode.window.showWarningMessage(t("Source changed while saving. Please run again."))
+            return
+        }
+        const toolchain = detectToolchain(getCamelPath())
+        channel.clear()
+        if (dirty.length) channel.appendLine(t("Saved {0} Camel files: {1}", dirty.length, dirty.map(doc => path.basename(doc.uri.fsPath)).join(', ')))
+        channel.appendLine(`> ${toolchain.camel} ${filePath}`)
+        channel.show(true)
+        return await new Promise<number | undefined>(resolve => {
+            const proc = child_process.spawn(toolchain.camel, [filePath], { cwd: path.dirname(filePath), windowsHide: true })
+            proc.stdout.on('data', data => channel.append(data.toString()))
+            proc.stderr.on('data', data => channel.append(data.toString()))
+            proc.on('error', error => {
+                channel.appendLine(t("Failed to start Camel: {0}", error.message))
+                void vscode.window.showErrorMessage(t("Failed to start Camel: {0}. {1}", error.message, spawnHint()))
+                resolve(undefined)
+            })
+            proc.on('close', code => {
+                channel.appendLine(t("\n[camel exited with code {0}]", code))
+                resolve(code ?? undefined)
+            })
+        })
+    } catch (error) {
+        channel.appendLine(t("Camel run cancelled: {0}", error))
+        void vscode.window.showErrorMessage(t("Run cancelled: {0}", error))
+        return
+    } finally {
+        runInProgress = false
+    }
 }
 
 // Extract a Graphviz DOT graph from camel stdout (the std::rgir family of passes).
@@ -116,12 +144,34 @@ async function computeGirDot(
     filePath: string,
     pass: string
 ): Promise<{ dot: string | null; output: string }> {
+    const uri = vscode.Uri.file(filePath)
+    const doc = await vscode.workspace.openTextDocument(uri)
+    await languageServerQueue
+    if (pass === 'std::rgir' && client?.initializeResult?.capabilities.experimental?.camelGraphProvider) {
+        const result = await client.sendRequest<{ text: string; diagnostics?: string }>('camel/graph', {
+            textDocument: { uri: uri.toString() }
+        })
+        return { dot: mapGirSources(extractDot(result.text), filePath), output: result.diagnostics || '' }
+    }
     const toolchain = detectToolchain(getCamelPath())
-    toolchain.warnings.forEach((w) => vscode.window.showWarningMessage(w))
-    const { stdout, stderr } = await execFileAsync(toolchain.camel, [filePath, pass], {
-        cwd: path.dirname(filePath)
-    })
-    return { dot: extractDot(stdout), output: stderr ? `${stdout}\n${stderr}` : stdout }
+    // CLI styles and older servers also use the editor buffer, keeping relative imports intact.
+    if (runtimeStatus.snapshot.compatibility?.features.cliGir?.supported === false) {
+        throw new Error(t('CLI GIR is unavailable: {0}', runtimeStatus.snapshot.compatibility.features.cliGir.reason))
+    }
+    const scratch = path.join(path.dirname(filePath), `.camel-gir-${randomUUID()}.cml`)
+    try {
+        await fs.promises.writeFile(scratch, doc.getText())
+        const { stdout, stderr } = await execFileAsync(toolchain.camel, ['--color', 'never', scratch, pass], {
+            cwd: path.dirname(filePath), windowsHide: true
+        })
+        const output = stdout.split(scratch).join(filePath)
+        return { dot: mapGirSources(extractDot(output), filePath, scratch), output: stderr ? `${output}\n${stderr}` : output }
+    } catch (error) {
+        const failure = error as Error & { stdout?: string; stderr?: string }
+        throw new Error([failure.message, failure.stdout, failure.stderr].filter(Boolean).join('\n').split(scratch).join(filePath))
+    } finally {
+        await fs.promises.unlink(scratch).catch(() => {})
+    }
 }
 
 interface GirPanelState {
@@ -129,9 +179,13 @@ interface GirPanelState {
     fileUri: string | null
     pass: string
     autoRefresh: boolean
+    followSource: boolean
     /** nodeKey -> GIR node origin (null when the node has none). */
     breakpoints: Map<string, number | null>
     pendingDot: string | null
+    pendingError?: string
+    revision: number
+    disposed: boolean
 }
 
 // Renders the GIR webview panel: toolbar (pass picker / auto refresh / refresh),
@@ -141,9 +195,12 @@ function registerGirPanel(context: vscode.ExtensionContext): GirPanelState {
         panel: undefined as unknown as vscode.WebviewPanel,
         fileUri: null,
         pass: 'std::rgir',
-        autoRefresh: true,
+        autoRefresh: context.workspaceState.get<boolean>('gir.autoRefresh', vscode.workspace.getConfiguration('opencmlLanguageServer').get('gir.refreshOn', 'onSave') === 'onSave'),
+        followSource: context.workspaceState.get<boolean>('gir.followSource', vscode.workspace.getConfiguration('opencmlLanguageServer').get('gir.followActiveEditor', true)),
         breakpoints: new Map<string, number | null>(),
-        pendingDot: null
+        pendingDot: null,
+        revision: 0,
+        disposed: false
     }
 
     state.panel = vscode.window.createWebviewPanel(
@@ -163,10 +220,13 @@ function registerGirPanel(context: vscode.ExtensionContext): GirPanelState {
         (message) => {
             switch (message.command) {
                 case 'ready':
+                    sendGirPreferences(context, state)
+                    state.panel.webview.postMessage({ command: 'followSource', enabled: state.followSource })
                     if (state.pendingDot !== null || state.fileUri) {
                         state.panel.webview.postMessage({
                             command: 'render',
                             dot: state.pendingDot,
+                            error: state.pendingError,
                             fileUri: state.fileUri ?? undefined,
                             fileName: state.fileUri ? path.basename(state.fileUri) : undefined,
                             pass: state.pass
@@ -174,19 +234,40 @@ function registerGirPanel(context: vscode.ExtensionContext): GirPanelState {
                     }
                     void pushPassGraphs()
                     return
+                case 'copyGir':
+                    if (typeof message.text === 'string') {
+                        void vscode.env.clipboard.writeText(message.text).then(() => state.panel.webview.postMessage({ command: 'girCopied' }))
+                    }
+                    return
+                case 'openGirText':
+                    if (typeof message.text === 'string') {
+                        void vscode.workspace.openTextDocument({ content: message.text, language: 'plaintext' })
+                            .then(doc => vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside))
+                    }
+                    return
                 case 'refresh':
                     if (state.fileUri) {
-                        renderForFile(state.fileUri, true)
+                        renderForFile(state, state.fileUri, true)
                     }
                     return
                 case 'passChanged':
-                    state.pass = message.pass || 'std::rgir'
+                    state.pass = ['std::rgir', 'std::agir', 'std::gir'].includes(message.pass) ? message.pass : 'std::rgir'
                     if (state.fileUri) {
-                        renderForFile(state.fileUri, true)
+                        renderForFile(state, state.fileUri, true)
                     }
+                    return
+                case 'followSource':
+                    state.followSource = !!message.enabled
+                    void context.workspaceState.update('gir.followSource', state.followSource)
+                    state.panel.webview.postMessage({ command: 'followSource', enabled: state.followSource })
+                    if (state.followSource) followActiveSource(vscode.window.activeTextEditor ?? lastCamelEditor)
                     return
                 case 'autoRefresh':
                     state.autoRefresh = !!message.enabled
+                    void context.workspaceState.update('gir.autoRefresh', state.autoRefresh)
+                    return
+                case 'browsingChanged':
+                    if (['flat', 'hierarchy'].includes(message.value)) void context.workspaceState.update('gir.browsing', message.value)
                     return
                 case 'passGraphsList':
                     void pushPassGraphs(message.target)
@@ -210,21 +291,24 @@ function registerGirPanel(context: vscode.ExtensionContext): GirPanelState {
                     if (!file) {
                         return
                     }
-                    const line = Math.max(0, Number(message.line ?? 0))
-                    const column = Math.max(0, Number(message.character ?? 0))
+                    const line = Number(message.line)
+                    const column = Number(message.character)
+                    if (!Number.isInteger(line) || line < 0 || !Number.isInteger(column) || column < 0) return
                     const target = path.isAbsolute(file)
                         ? file
                         : state.fileUri
                           ? path.join(path.dirname(state.fileUri), file)
                           : file
+                    sourceRevealDepth++
                     void vscode.workspace.openTextDocument(target).then(
                         (doc) =>
                             vscode.window.showTextDocument(doc, {
                                 selection: new vscode.Range(line, column, line, column),
+                                viewColumn: vscode.window.visibleTextEditors.find(editor => editor.document.uri.fsPath === target)?.viewColumn ?? vscode.ViewColumn.One,
                                 preview: true
                             }),
-                        () => vscode.window.showWarningMessage(`Cannot open ${target}`)
-                    )
+                        () => vscode.window.showWarningMessage(t("Cannot open {0}", target))
+                    ).then(() => { sourceRevealDepth-- }, () => { sourceRevealDepth-- })
                     return
                 }
                 case 'alert':
@@ -238,7 +322,8 @@ function registerGirPanel(context: vscode.ExtensionContext): GirPanelState {
 
     state.panel.onDidDispose(
         () => {
-            girState = null
+            state.disposed = true
+            if (girState === state) girState = null
         },
         null,
         context.subscriptions
@@ -247,7 +332,27 @@ function registerGirPanel(context: vscode.ExtensionContext): GirPanelState {
     return state
 }
 
+function sendGirPreferences(context: vscode.ExtensionContext, state: GirPanelState) {
+    const config = vscode.workspace.getConfiguration('opencmlLanguageServer')
+    void state.panel.webview.postMessage({ command: 'preferences',
+        autoRefresh: state.autoRefresh, followSource: state.followSource,
+        browsing: context.workspaceState.get('gir.browsing', config.get('gir.defaultView', 'hierarchy')),
+        edgeLabels: config.get('gir.edgeLabels', 'onHover'),
+        hoverNeighborhood: config.get('gir.hoverNeighborhood', 'both'),
+        rememberViewport: config.get('gir.rememberViewport', true)
+    })
+}
+
 let girState: GirPanelState | null = null
+let sourceRevealDepth = 0
+let lastCamelEditor: vscode.TextEditor | undefined
+function followActiveSource(editor: vscode.TextEditor | undefined) {
+    if (!editor || editor.document.languageId !== 'cml' || editor.document.uri.scheme !== 'file') return
+    lastCamelEditor = editor
+    if (sourceRevealDepth || !girState?.followSource || girState.fileUri === editor.document.uri.fsPath) return
+    girState.fileUri = editor.document.uri.fsPath
+    void renderForFile(girState, girState.fileUri, false)
+}
 
 /** Push the panel's origin breakpoints into active debug sessions. */
 function syncPanelBreakpoints(state: GirPanelState) {
@@ -275,7 +380,9 @@ function resolvePassGraphTarget(explicit?: unknown): { port: number; target: str
 }
 
 /** GET /api/pass-graphs; empty list on old camel-db (404) or any transient failure. */
+let passGraphError: string | undefined
 async function fetchPassGraphs(explicit?: unknown): Promise<PassGraphEntry[]> {
+    passGraphError = undefined
     const t = resolvePassGraphTarget(explicit)
     if (!t) {
         return []
@@ -291,7 +398,8 @@ async function fetchPassGraphs(explicit?: unknown): Promise<PassGraphEntry[]> {
         return data.graphs
             .filter((g) => g && Number.isInteger(g.index))
             .map((g) => ({ index: Number(g.index), pass: typeof g.pass === 'string' ? g.pass : null }))
-    } catch {
+    } catch (error) {
+        if (error instanceof DebugHttpError && (error.status === 404 || error.status === 405)) passGraphError = error.message
         return []
     }
 }
@@ -299,21 +407,21 @@ async function fetchPassGraphs(explicit?: unknown): Promise<PassGraphEntry[]> {
 /** Push the per-pass snapshot list to the panel (empty when camel-db has none). */
 async function pushPassGraphs(explicit?: unknown): Promise<void> {
     const graphs = await fetchPassGraphs(explicit)
-    girState?.panel.webview.postMessage({ command: 'passGraphs', graphs })
+    girState?.panel.webview.postMessage({ command: 'passGraphs', graphs, error: passGraphError })
 }
 
 /** GET /api/pass-graph and push one snapshot's DOT to the panel. */
 async function pushPassGraph(index: unknown, explicit?: unknown): Promise<void> {
     const i = Number(index)
-    const t = resolvePassGraphTarget(explicit)
-    if (!t || !Number.isInteger(i)) {
-        girState?.panel.webview.postMessage({ command: 'passGraph', index: i, pass: null, dot: null, error: 'no debug target' })
+    const target = resolvePassGraphTarget(explicit)
+    if (!target || !Number.isInteger(i)) {
+        girState?.panel.webview.postMessage({ command: 'passGraph', index: i, pass: null, dot: null, error: t("no debug target") })
         return
     }
     try {
         const data = (await apiGet(
-            t.port,
-            `/api/pass-graph?target=${encodeURIComponent(t.target)}&index=${i}`
+            target.port,
+            `/api/pass-graph?target=${encodeURIComponent(target.target)}&index=${i}`
         )) as { index?: unknown; pass?: unknown; dot?: unknown }
         girState?.panel.webview.postMessage({
             command: 'passGraph',
@@ -327,9 +435,9 @@ async function pushPassGraph(index: unknown, explicit?: unknown): Promise<void> 
 }
 
 async function showGirPanel(context: vscode.ExtensionContext) {
-    const editor = vscode.window.activeTextEditor
-    if (!editor || editor.document.languageId !== 'cml') {
-        vscode.window.showInformationMessage('Open a CML file first, then visualize GraphIR.')
+    const editor = vscode.window.activeTextEditor ?? lastCamelEditor
+    if (!editor || editor.document.languageId !== 'cml' || editor.document.uri.scheme !== 'file') {
+        vscode.window.showInformationMessage(t("Open a saved CML file first, then visualize GraphIR."))
         return
     }
     const filePath = editor.document.uri.fsPath
@@ -338,37 +446,43 @@ async function showGirPanel(context: vscode.ExtensionContext) {
         girState = registerGirPanel(context)
     }
     girState.fileUri = filePath
-    girState.panel.reveal(editor.viewColumn)
+    girState.panel.reveal(vscode.ViewColumn.Beside, true)
     await renderForFile(girState, filePath, true)
 }
 
 async function renderForFile(state: GirPanelState, filePath: string, errorToast: boolean) {
+    const revision = ++state.revision
+    const pass = state.pass
+    state.pendingDot = null
+    state.pendingError = undefined
+    state.panel.title = `GIR · ${path.basename(filePath)}`
+    state.panel.webview.postMessage({ command: 'loading', fileUri: filePath, fileName: path.basename(filePath), pass })
     try {
-        const { dot } = await computeGirDot(filePath, state.pass)
+        const { dot, output } = await computeGirDot(filePath, pass)
+        if (state.disposed || revision !== state.revision) return
         state.pendingDot = dot
+        state.pendingError = dot ? undefined : output || t("Camel did not produce GIR. Check the source diagnostics.")
         state.panel.webview.postMessage({
-            command: 'render',
-            dot,
-            fileUri: state.fileUri ?? undefined,
-            fileName: path.basename(filePath),
-            pass: state.pass,
-            error: dot ? undefined : 'Camel did not produce a GraphIR for this file.'
+            command: 'render', dot, fileUri: filePath, fileName: path.basename(filePath),
+            pass, error: state.pendingError
         })
     } catch (error) {
-        if (errorToast) {
-            vscode.window.showErrorMessage(`Failed to run Camel: ${error}. ${spawnHint()}`)
-        }
+        if (state.disposed || revision !== state.revision) return
+        state.pendingError = String(error)
+        state.panel.webview.postMessage({ command: 'render', dot: null, fileUri: filePath, fileName: path.basename(filePath), pass, error: state.pendingError })
+        if (errorToast) getOutputChannel().appendLine(`GIR generation failed: ${error}`)
     }
 }
 
 function getWebviewContent(context: vscode.ExtensionContext, panel: vscode.WebviewPanel) {
     const htmlPath = path.join(context.extensionPath, 'dist', 'panels', 'graphviz', 'index.html')
     let html = fs.readFileSync(htmlPath, 'utf8')
+    html = html.replace(/<html[^>]*>/, `<html lang="${vscode.env.language.replace(/[^a-zA-Z0-9-]/g, '') || 'en'}">`)
 
     // Rewrite relative asset URLs (e.g. ../../assets/graphviz/xxx.js) to webview URIs
-    const distDir = path.join(context.extensionPath, 'dist')
+    const htmlDir = path.dirname(htmlPath)
     html = html.replace(/(src|href)="(\.\.\/[^"]+)"/g, (_match, attr: string, relPath: string) => {
-        const absPath = path.join(distDir, relPath)
+        const absPath = path.resolve(htmlDir, relPath)
         const uri = panel.webview.asWebviewUri(vscode.Uri.file(absPath))
         return `${attr}="${uri}"`
     })
@@ -381,17 +495,19 @@ function getWebviewContent(context: vscode.ExtensionContext, panel: vscode.Webvi
 }
 
 export function activate(context: vscode.ExtensionContext) {
-    addWordToSpellChecker(['opencml', 'opencmlrc', 'typeas'])
+    runtimeStatus = new RuntimeStatus()
+    context.subscriptions.push(runtimeStatus)
+    registerDiagnosticAdvice(context)
 
     context.subscriptions.push(
         vscode.commands.registerCommand('camel.showPath', () => {
-            showCamelPath()
+            return vscode.commands.executeCommand('camel.showRuntimeInfo')
         })
     )
 
     context.subscriptions.push(
         vscode.commands.registerCommand('camel.run', () => {
-            runCamel()
+            return runCamel()
         })
     )
 
@@ -400,6 +516,9 @@ export function activate(context: vscode.ExtensionContext) {
             await showGirPanel(context)
         })
     )
+
+    context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(followActiveSource))
+    followActiveSource(vscode.window.activeTextEditor)
 
     // Auto-refresh the GIR panel when its tracked file is saved.
     context.subscriptions.push(
@@ -456,63 +575,192 @@ export function activate(context: vscode.ExtensionContext) {
         })
     )
 
-    // LSP related code
-    //
-    // Preferred: the standardized Camel language server (camel-ls), spawned directly.
-    // Fallback: the bundled Node language server, which shells out to the Camel CLI
-    // (used when camel-ls is not locatable next to the configured camel executable).
-
-    const toolchain = detectToolchain(getCamelPath())
-    toolchain.warnings.forEach((w) => vscode.window.showWarningMessage(w))
-
-    let serverOptions: ServerOptions
-    if (toolchain.camelLs) {
-        serverOptions = {
-            run: { command: toolchain.camelLs, args: ['--stdio'], transport: TransportKind.stdio },
-            debug: {
-                command: toolchain.camelLs,
-                args: ['--stdio'],
-                transport: TransportKind.stdio
+    context.subscriptions.push(
+        vscode.commands.registerCommand('camel.showRuntimeInfo', async () => {
+            await languageServerQueue
+            const report = await inspectRuntime(runtimeStatus.snapshot)
+            runtimeStatus.set({ ...runtimeStatus.snapshot, compatibility: report.compatibility })
+            const channel = getOutputChannel()
+            channel.appendLine(`\nCamel Runtime Check\n${JSON.stringify(report, null, 2)}`)
+            channel.show(true)
+            return report
+        }),
+        vscode.commands.registerCommand('camel.runtimeMenu', async () => {
+            const choice = await vscode.window.showQuickPick([
+                { label: t("$(info) Runtime details and health check"), command: 'camel.showRuntimeInfo' },
+                { label: t("$(refresh) Restart language server"), command: 'camel.restartServer' },
+                { label: t("$(settings-gear) Configure Camel path"), command: 'workbench.action.openSettings' }
+            ], { title: t("Camel Runtime"), placeHolder: runtimeStatus.snapshot.toolchain?.camel })
+            if (choice) await vscode.commands.executeCommand(choice.command, ...(choice.command === 'workbench.action.openSettings' ? ['opencmlLanguageServer'] : []))
+        }),
+        vscode.commands.registerCommand('camel.restartServer', () => restartLanguageServer(context)),
+        vscode.commands.registerCommand('camel.format', () => vscode.commands.executeCommand('editor.action.formatDocument')),
+        vscode.workspace.onDidChangeConfiguration(async event => {
+            const config = vscode.workspace.getConfiguration('opencmlLanguageServer')
+            if (event.affectsConfiguration('opencmlLanguageServer.inlayHints') && client?.isRunning()) {
+                const feature = client.getFeature(InlayHintRequest.method)
+                for (const editor of vscode.window.visibleTextEditors) {
+                    if (editor.document.languageId === 'cml') feature.getProvider(editor.document)?.onDidChangeInlayHints.fire()
+                }
             }
-        }
-    } else {
-        const serverModule = context.asAbsolutePath(path.join('dist', 'server', 'server.cjs'))
-        serverOptions = {
-            run: { module: serverModule, transport: TransportKind.ipc },
-            debug: {
-                module: serverModule,
-                transport: TransportKind.ipc
+            if (event.affectsConfiguration('opencmlLanguageServer.gir')) {
+                if (event.affectsConfiguration('opencmlLanguageServer.gir.followActiveEditor')) {
+                    await context.workspaceState.update('gir.followSource', undefined)
+                    if (girState) girState.followSource = config.get('gir.followActiveEditor', true)
+                }
+                if (event.affectsConfiguration('opencmlLanguageServer.gir.refreshOn')) {
+                    await context.workspaceState.update('gir.autoRefresh', undefined)
+                    if (girState) girState.autoRefresh = config.get('gir.refreshOn', 'onSave') === 'onSave'
+                }
+                if (event.affectsConfiguration('opencmlLanguageServer.gir.defaultView')) await context.workspaceState.update('gir.browsing', undefined)
+                if (girState) { sendGirPreferences(context, girState); followActiveSource(vscode.window.activeTextEditor ?? lastCamelEditor) }
             }
-        }
-    }
-
-    // Options to control the language client
-    const clientOptions: LanguageClientOptions = {
-        // Register the server for plain text documents
-        documentSelector: [
-            { scheme: 'file', language: 'cml' },
-            { scheme: 'file', language: 'psl' }
-        ],
-        synchronize: {
-            fileEvents: vscode.workspace.createFileSystemWatcher('**/.opencmlrc')
-        }
-    }
-
-    // Create the language client and start the client.
-    client = new LanguageClient(
-        'opencmlLanguageServer',
-        'OpenCML Language Server',
-        serverOptions,
-        clientOptions
+            if (['camelPath', 'camelLsPath', 'diagnostics', 'maxNumberOfProblems'].some(key =>
+                event.affectsConfiguration(`opencmlLanguageServer.${key}`))) {
+                void restartLanguageServer(context)
+            }
+        })
     )
-
-    // Start the client. This will also launch the server
-    client.start()
+    void restartLanguageServer(context)
 }
 
-export function deactivate(): Thenable<void> | undefined {
-    if (!client) {
-        return undefined
-    }
-    return client.stop()
+// Serialize restarts: a settings change during startup must never leave two servers running.
+function restartLanguageServer(context: vscode.ExtensionContext): Promise<void> {
+    languageServerQueue = languageServerQueue.then(async () => {
+        const previous = client
+        client = undefined
+        serverStateListener?.dispose()
+        sourceWatcher?.dispose()
+        diagnosticCloseListener?.dispose()
+        runtimeStatus.set({ ...runtimeStatus.snapshot, phase: 'starting', error: undefined })
+        if (previous) await previous.dispose()
+        if (deactivating) return
+
+        const config = vscode.workspace.getConfiguration('opencmlLanguageServer')
+        const explicitServer = config.get<string>('camelLsPath') || ''
+        const toolchain = detectToolchain(getCamelPath(), explicitServer)
+        toolchain.warnings.forEach(w => void vscode.window.showWarningMessage(w))
+        runtimeStatus.set({ phase: 'starting', toolchain })
+        const compatibility = await inspectCompatibility(toolchain.camel)
+        if (deactivating) return
+        runtimeStatus.set({ phase: 'starting', toolchain, compatibility })
+        for (const warning of compatibility.warnings) getOutputChannel().appendLine(warning)
+        if (compatibility.warnings.length) void vscode.window.showWarningMessage(compatibility.warnings.join('\n'))
+        if (explicitServer.trim() && !toolchain.camelLs) {
+            runtimeStatus.set({ phase: 'failed', toolchain, error: toolchain.warnings.join('\n') })
+            return
+        }
+
+        const serverModule = context.asAbsolutePath(path.join('dist', 'server', 'server.cjs'))
+        const serverOptions: ServerOptions = toolchain.camelLs
+            ? { command: toolchain.camelLs, args: ['--stdio'] }
+            : { module: serverModule, transport: TransportKind.ipc }
+        if (!toolchain.camelLs) {
+            getOutputChannel().appendLine(t("camel-ls was not found. Using CLI diagnostics and formatting only. Install camel-ls for completion, navigation, rename and semantic highlighting."))
+        } else {
+            getOutputChannel().appendLine(`Starting ${toolchain.camelLs} --stdio`)
+        }
+        sourceWatcher = vscode.workspace.createFileSystemWatcher('**/*.cml')
+        const savedReports = new Map<string, vsdiag.DocumentDiagnosticReport>()
+        diagnosticCloseListener = vscode.workspace.onDidCloseTextDocument(doc => savedReports.delete(doc.uri.toString()))
+        const clientOptions: LanguageClientOptions = {
+            diagnosticPullOptions: { onChange: vscode.workspace.getConfiguration('opencmlLanguageServer').get('diagnostics.trigger', 'onChange') === 'onChange', onSave: true },
+            initializationOptions: {
+                diagnostics: 'pull',
+                debounceMs: vscode.workspace.getConfiguration('opencmlLanguageServer').get('diagnostics.debounceMs', 300),
+                cliDiagnostics: compatibility.features.cliDiagnostics?.supported !== false,
+                cliFormatting: !!toolchain.camelFormat
+            },
+            documentSelector: [
+                { scheme: 'file', language: 'cml' },
+                ...(toolchain.camelLs ? [{ scheme: 'untitled', language: 'cml' }] : [])
+            ],
+            synchronize: { configurationSection: 'opencmlLanguageServer', fileEvents: sourceWatcher },
+            middleware: {
+                provideInlayHints: async (document, range, token, next) => {
+                    const hints = await next(document, range, token)
+                    const settings = vscode.workspace.getConfiguration('opencmlLanguageServer', document.uri)
+                    return hints?.filter(hint => hint.kind === vscode.InlayHintKind.Type ? settings.get('inlayHints.types', true) : settings.get('inlayHints.parameterNames', true))
+                },
+                provideCodeActions: async (document, range, context, token, next) => {
+                    const actions = await next(document, range, context, token)
+                    for (const action of actions ?? []) {
+                        const match = /^Replace with '([^']+)'$/.exec(action.title)
+                        if (match) action.title = t("Replace with '{0}'", match[1])
+                    }
+                    return actions
+                },
+                handleDiagnostics: (uri, diagnostics, next) => next(uri, presentDiagnostics(diagnostics, uri)),
+                provideDiagnostics: async (document, previousResultId, token, next) => {
+                    const uri = document instanceof vscode.Uri ? document : document.uri
+                    const buffer = document instanceof vscode.Uri ? vscode.workspace.textDocuments.find(doc => doc.uri.toString() === uri.toString()) : document
+                    if (buffer?.isDirty && vscode.workspace.getConfiguration('opencmlLanguageServer').get('diagnostics.trigger') === 'onSave') {
+                        return savedReports.get(uri.toString()) ?? { kind: vsdiag.DocumentDiagnosticReportKind.full, items: [] }
+                    }
+                    // Delay pull requests without delaying didChange or semantic requests.
+                    const delay = vscode.workspace.getConfiguration('opencmlLanguageServer').get('diagnostics.debounceMs', 300)
+                    if (buffer?.isDirty && delay > 0) await new Promise<void>(resolve => {
+                        const timer = setTimeout(() => { subscription.dispose(); resolve() }, delay)
+                        const subscription = token.onCancellationRequested(() => { clearTimeout(timer); subscription.dispose(); resolve() })
+                    })
+                    if (token.isCancellationRequested) return undefined
+                    const report = await next(document, previousResultId, token)
+                    if (!report) return report
+                    if (report.kind === 'full') report.items = presentDiagnostics(report.items, uri)
+                    for (const [uri, related] of Object.entries(report.relatedDocuments || {})) {
+                        if (related.kind === 'full') related.items = presentDiagnostics(related.items, vscode.Uri.parse(uri))
+                    }
+                    if (report.kind === 'full') savedReports.set(uri.toString(), report)
+                    return report
+                }
+            }
+        }
+        const started = new LanguageClient(
+            'opencmlLanguageServer', t("Camel Language Server"), serverOptions, clientOptions
+        )
+        client = started
+        serverStateListener = started.onDidChangeState(event => {
+            if (client !== started) return
+            runtimeStatus.set({
+                toolchain,
+                compatibility,
+                capabilities: started.initializeResult?.capabilities,
+                phase: event.newState === State.Running ? (toolchain.camelLs ? 'native' : 'fallback') : event.newState === State.Starting ? 'starting' : 'stopped',
+                serverVersion: started.initializeResult?.serverInfo?.version
+            })
+        })
+        try {
+            await started.start()
+            compatibility.features = { ...compatibility.features, ...languageFeatures(started.initializeResult?.capabilities) }
+            const missing = Object.entries(compatibility.features).filter(([, feature]) => feature.supported === false).map(([name]) => name)
+            if (missing.length) {
+                const warning = t('Unavailable runtime features: {0}. See Runtime Info and Health Check for details.', missing.join(', '))
+                compatibility.warnings.push(warning)
+                getOutputChannel().appendLine(warning)
+                void vscode.window.showWarningMessage(warning)
+            }
+            runtimeStatus.set({ ...runtimeStatus.snapshot, compatibility, capabilities: started.initializeResult?.capabilities })
+        } catch (error) {
+            if (client === started) client = undefined
+            await started.dispose()
+            throw error
+        }
+    }).catch(error => {
+        runtimeStatus.set({ ...runtimeStatus.snapshot, phase: 'failed', error: String(error) })
+        getOutputChannel().appendLine(`Language server error: ${error}`)
+        void vscode.window.showErrorMessage(t("Camel language server failed: {0}. {1}", error, spawnHint()))
+    })
+    return languageServerQueue
+}
+
+export async function deactivate(): Promise<void> {
+    deactivating = true
+    serverStateListener?.dispose()
+    sourceWatcher?.dispose()
+    diagnosticCloseListener?.dispose()
+    await languageServerQueue
+    const running = client
+    client = undefined
+    await running?.dispose()
+    outputChannel?.dispose()
 }

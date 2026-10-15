@@ -31,6 +31,11 @@ fs.writeFileSync(
     JSON.stringify({ 'opencmlLanguageServer.camelPath': camelPathSetting }, null, 4)
 )
 fs.writeFileSync(path.join(workspace, 'mode.txt'), mode)
+// An isolated profile needs its own installed language-pack registry for --locale.
+if (process.env.E2E_LANGUAGEPACKS) {
+    fs.mkdirSync(path.join(workspace, 'vscode-user'), { recursive: true })
+    fs.copyFileSync(process.env.E2E_LANGUAGEPACKS, path.join(workspace, 'vscode-user', 'languagepacks.json'))
+}
 console.log('E2E workspace:', workspace)
 console.log('E2E mode:', mode)
 console.log('Camel exe:', camelExe)
@@ -43,10 +48,10 @@ if (mode !== 'fallback' && !fs.existsSync(camelExe)) {
 
 try {
     await runTests({
-        vscodeExecutablePath: 'G:/DevTools/Microsoft VS Code/Code.exe',
+        vscodeExecutablePath: process.env.VSCODE_EXECUTABLE_PATH || 'G:/DevTools/Microsoft VS Code/Code.exe',
         extensionDevelopmentPath: repoRoot,
         extensionTestsPath: path.join(__dirname, 'index.cjs'),
-        launchArgs: [workspace, '--disable-extensions']
+        launchArgs: ['--locale', process.env.E2E_LOCALE || 'en', ...(mode === 'gir' ? ['--remote-debugging-port=19338'] : []), workspace, '--disable-extensions', '--user-data-dir', path.join(workspace, 'vscode-user'), '--skip-welcome', '--skip-release-notes', '--disable-workspace-trust']
     })
     console.log('E2E PASSED')
     process.exit(0)

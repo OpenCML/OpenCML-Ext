@@ -1,55 +1,63 @@
 {
     "name": "open-cml-extension",
     "displayName": "OpenCML-Ext",
-    "description": "OpenCML Extension for VSCode — GraphIR visualization and Camel debugging",
-    "version": "1.2.0",
+    "description": "%description%",
+    "version": "1.8.0",
     "publisher": "Kogler7",
     "icon": "assets/icon.jpg",
     "type": "module",
     "scripts": {
         "build": "npm run build --workspaces",
-        "pub": "node ./publish.js"
+        "pub": "node ./publish.js",
+        "test:i18n": "node scripts/localization-test.mjs",
+        "test:compatibility": "node scripts/compatibility-test.mjs",
+        "test:lsp": "node scripts/toolchain-test.mjs && node scripts/lsp-smoke-test.mjs && node scripts/lsp-camel-ls-check.mjs && node test/lsp-workspace.mjs"
     },
     "engines": {
         "vscode": "^1.82.0"
+    },
+    "camelCompatibility": {
+        "minimumSupportedVersion": "0.2.11",
+        "policy": "warn-and-probe",
+        "independentToolVersions": true
     },
     "categories": [
         "Programming Languages"
     ],
     "repository": {
         "type": "git",
-        "url": "https://github.com/Kogler7/OpenCML-Ext.git"
+        "url": "https://github.com/OpenCML/OpenCML-Ext.git"
     },
     "activationEvents": [],
     "main": "./dist/extension/extension.cjs",
     "contributes": {
         "configuration": {
             "type": "object",
-            "title": "Camel configuration",
+            "title": "%contributes.configuration.title%",
             "properties": {
                 "opencmlLanguageServer.camelPath": {
                     "scope": "resource",
                     "type": "string",
                     "default": "camel",
-                    "description": "Path to the Camel executable (e.g. camel or /path/to/camel.exe). Sibling tools (camel-ls, camel-format, camel-db) are auto-detected next to it."
+                    "description": "%contributes.configuration.properties.opencmlLanguageServer.camelPath.description%"
                 },
                 "opencmlLanguageServer.camelDbPath": {
                     "scope": "resource",
                     "type": "string",
                     "default": "",
-                    "description": "Path to the Camel debugger executable (camel-db). Empty: resolved next to the Camel executable."
+                    "description": "%contributes.configuration.properties.opencmlLanguageServer.camelDbPath.description%"
                 },
                 "opencmlLanguageServer.debugPort": {
                     "scope": "resource",
                     "type": "number",
                     "default": 8765,
-                    "description": "TCP port used to talk to the Camel debugger (camel-db serve)."
+                    "description": "%contributes.configuration.properties.opencmlLanguageServer.debugPort.description%"
                 },
                 "opencmlLanguageServer.maxNumberOfProblems": {
                     "scope": "resource",
                     "type": "number",
                     "default": 100,
-                    "description": "Controls the maximum number of problems produced by the server."
+                    "description": "%contributes.configuration.properties.opencmlLanguageServer.maxNumberOfProblems.description%"
                 },
                 "opencmlLanguageServer.trace.server": {
                     "scope": "window",
@@ -60,7 +68,145 @@
                         "verbose"
                     ],
                     "default": "off",
-                    "description": "Traces the communication between VS Code and the language server."
+                    "description": "%contributes.configuration.properties.opencmlLanguageServer.trace.server.description%"
+                },
+                "opencmlLanguageServer.camelLsPath": {
+                    "scope": "machine-overridable",
+                    "type": "string",
+                    "default": "",
+                    "description": "%contributes.configuration.properties.opencmlLanguageServer.camelLsPath.description%"
+                },
+                "opencmlLanguageServer.diagnostics.trigger": {
+                    "scope": "window",
+                    "type": "string",
+                    "default": "onChange",
+                    "description": "%configuration.diagnostics.trigger%",
+                    "enum": [
+                        "onChange",
+                        "onSave"
+                    ],
+                    "enumDescriptions": [
+                        "%configuration.diagnostics.trigger.onChange%",
+                        "%configuration.diagnostics.trigger.onSave%"
+                    ]
+                },
+                "opencmlLanguageServer.diagnostics.debounceMs": {
+                    "scope": "window",
+                    "type": "integer",
+                    "default": 300,
+                    "description": "%configuration.diagnostics.debounceMs%",
+                    "minimum": 0,
+                    "maximum": 5000
+                },
+                "opencmlLanguageServer.diagnostics.severityOverrides": {
+                    "scope": "window",
+                    "type": "object",
+                    "default": {},
+                    "description": "%configuration.diagnostics.severityOverrides%",
+                    "additionalProperties": {
+                        "type": "string",
+                        "enum": [
+                            "error",
+                            "warning",
+                            "information",
+                            "hint",
+                            "off"
+                        ]
+                    }
+                },
+                "opencmlLanguageServer.gir.followActiveEditor": {
+                    "scope": "window",
+                    "type": "boolean",
+                    "default": true,
+                    "description": "%configuration.gir.followActiveEditor%"
+                },
+                "opencmlLanguageServer.gir.refreshOn": {
+                    "scope": "window",
+                    "type": "string",
+                    "default": "onSave",
+                    "description": "%configuration.gir.refreshOn%",
+                    "enum": [
+                        "onSave",
+                        "manual"
+                    ],
+                    "enumDescriptions": [
+                        "%configuration.gir.refreshOn.onSave%",
+                        "%configuration.gir.refreshOn.manual%"
+                    ]
+                },
+                "opencmlLanguageServer.gir.defaultView": {
+                    "scope": "window",
+                    "type": "string",
+                    "default": "hierarchy",
+                    "description": "%configuration.gir.defaultView%",
+                    "enum": [
+                        "hierarchy",
+                        "flat"
+                    ],
+                    "enumDescriptions": [
+                        "%configuration.gir.defaultView.hierarchy%",
+                        "%configuration.gir.defaultView.flat%"
+                    ]
+                },
+                "opencmlLanguageServer.gir.edgeLabels": {
+                    "scope": "window",
+                    "type": "string",
+                    "default": "onHover",
+                    "description": "%configuration.gir.edgeLabels%",
+                    "enum": [
+                        "onHover",
+                        "always",
+                        "never"
+                    ],
+                    "enumDescriptions": [
+                        "%configuration.gir.edgeLabels.onHover%",
+                        "%configuration.gir.edgeLabels.always%",
+                        "%configuration.gir.edgeLabels.never%"
+                    ]
+                },
+                "opencmlLanguageServer.gir.hoverNeighborhood": {
+                    "scope": "window",
+                    "type": "string",
+                    "default": "both",
+                    "description": "%configuration.gir.hoverNeighborhood%",
+                    "enum": [
+                        "both",
+                        "upstream",
+                        "downstream",
+                        "off"
+                    ],
+                    "enumDescriptions": [
+                        "%configuration.gir.hoverNeighborhood.both%",
+                        "%configuration.gir.hoverNeighborhood.upstream%",
+                        "%configuration.gir.hoverNeighborhood.downstream%",
+                        "%configuration.gir.hoverNeighborhood.off%"
+                    ]
+                },
+                "opencmlLanguageServer.gir.rememberViewport": {
+                    "scope": "window",
+                    "type": "boolean",
+                    "default": true,
+                    "description": "%configuration.gir.rememberViewport%"
+                },
+                "opencmlLanguageServer.runtime.checkTimeoutMs": {
+                    "scope": "window",
+                    "type": "integer",
+                    "default": 60000,
+                    "description": "%configuration.runtime.checkTimeoutMs%",
+                    "minimum": 1000,
+                    "maximum": 600000
+                },
+                "opencmlLanguageServer.inlayHints.types": {
+                    "scope": "resource",
+                    "type": "boolean",
+                    "default": true,
+                    "description": "%configuration.inlayHints.types%"
+                },
+                "opencmlLanguageServer.inlayHints.parameterNames": {
+                    "scope": "resource",
+                    "type": "boolean",
+                    "default": true,
+                    "description": "%configuration.inlayHints.parameterNames%"
                 }
             }
         },
@@ -70,6 +216,11 @@
                     "command": "camel.run",
                     "when": "editorLangId == cml",
                     "group": "navigation"
+                },
+                {
+                    "command": "camel.vizGIR",
+                    "when": "editorLangId == cml",
+                    "group": "navigation@2"
                 }
             ],
             "webview/context": [
@@ -81,27 +232,45 @@
                     "command": "camel.run",
                     "when": "webviewId == 'camel' && webviewSection == 'editor'"
                 }
+            ],
+            "editor/context": [
+                {
+                    "command": "camel.vizGIR",
+                    "when": "editorLangId == cml",
+                    "group": "navigation@90"
+                }
             ]
         },
         "commands": [
             {
                 "command": "camel.vizGIR",
-                "title": "Visualize GraphIR",
-                "category": "Camel"
+                "title": "%contributes.commands.0.title%",
+                "category": "Camel",
+                "icon": "$(type-hierarchy)"
             },
             {
                 "command": "camel.run",
-                "title": "Run Camel"
+                "title": "%contributes.commands.1.title%"
             },
             {
                 "command": "camel.format",
-                "title": "Format Camel Code"
+                "title": "%contributes.commands.2.title%"
+            },
+            {
+                "command": "camel.restartServer",
+                "title": "%contributes.commands.3.title%",
+                "category": "Camel"
+            },
+            {
+                "command": "camel.showRuntimeInfo",
+                "title": "%contributes.commands.4.title%",
+                "category": "Camel"
             }
         ],
         "debuggers": [
             {
                 "type": "camel",
-                "label": "Camel Debug",
+                "label": "%contributes.debuggers.0.label%",
                 "languages": [
                     "cml"
                 ],
@@ -113,17 +282,17 @@
                         "properties": {
                             "program": {
                                 "type": "string",
-                                "description": "Absolute path of the CML file to debug.",
+                                "description": "%contributes.debuggers.0.configurationAttributes.launch.properties.program.description%",
                                 "default": "${file}"
                             },
                             "debugPort": {
                                 "type": "number",
-                                "description": "Port camel-db serves its API on.",
+                                "description": "%contributes.debuggers.0.configurationAttributes.launch.properties.debugPort.description%",
                                 "default": 8765
                             },
                             "camelDbPath": {
                                 "type": "string",
-                                "description": "Path to camel-db. Default: resolved next to the Camel executable."
+                                "description": "%contributes.debuggers.0.configurationAttributes.launch.properties.camelDbPath.description%"
                             }
                         }
                     },
@@ -131,7 +300,7 @@
                         "properties": {
                             "debugPort": {
                                 "type": "number",
-                                "description": "Port of a running camel-db instance.",
+                                "description": "%contributes.debuggers.0.configurationAttributes.attach.properties.debugPort.description%",
                                 "default": 8765
                             }
                         }
@@ -141,28 +310,28 @@
                     {
                         "type": "camel",
                         "request": "launch",
-                        "name": "Debug Camel file",
+                        "name": "%contributes.debuggers.0.initialConfigurations.0.name%",
                         "program": "${file}"
                     }
                 ],
                 "configurationSnippets": [
                     {
-                        "label": "Camel: Debug current file",
-                        "description": "Launch camel-db and debug the current CML file.",
+                        "label": "%contributes.debuggers.0.configurationSnippets.0.label%",
+                        "description": "%contributes.debuggers.0.configurationSnippets.0.description%",
                         "body": {
                             "type": "camel",
                             "request": "launch",
-                            "name": "Debug Camel file",
+                            "name": "%contributes.debuggers.0.configurationSnippets.0.body.name%",
                             "program": "${file}"
                         }
                     },
                     {
-                        "label": "Camel: Attach to running camel-db",
-                        "description": "Attach to a camel-db instance already serving on a port.",
+                        "label": "%contributes.debuggers.0.configurationSnippets.1.label%",
+                        "description": "%contributes.debuggers.0.configurationSnippets.1.description%",
                         "body": {
                             "type": "camel",
                             "request": "attach",
-                            "name": "Attach to camel-db",
+                            "name": "%contributes.debuggers.0.configurationSnippets.1.body.name%",
                             "debugPort": 8765
                         }
                     }
@@ -212,6 +381,66 @@
                 "language": "psl",
                 "scopeName": "source.psl",
                 "path": "./syntaxes/psl.tmLanguage.json"
+            }
+        ],
+        "semanticTokenModifiers": [
+            {
+                "id": "mutable",
+                "description": "%contributes.semanticTokenModifiers.0.description%"
+            },
+            {
+                "id": "sync",
+                "description": "%contributes.semanticTokenModifiers.1.description%"
+            }
+        ],
+        "semanticTokenScopes": [
+            {
+                "language": "cml",
+                "scopes": {
+                    "variable.mutable": [
+                        "variable.other.readwrite.mutable.cml"
+                    ],
+                    "parameter.mutable": [
+                        "variable.parameter.mutable.cml"
+                    ],
+                    "function.sync": [
+                        "entity.name.function.sync.cml"
+                    ],
+                    "function.defaultLibrary": [
+                        "support.function.cml"
+                    ],
+                    "type.defaultLibrary": [
+                        "support.type.cml"
+                    ],
+                    "macro": [
+                        "entity.name.function.macro.cml"
+                    ],
+                    "function": [
+                        "entity.name.function.cml"
+                    ],
+                    "variable": [
+                        "variable.other.cml"
+                    ],
+                    "parameter": [
+                        "variable.parameter.cml"
+                    ],
+                    "type": [
+                        "entity.name.type.cml"
+                    ]
+                }
+            }
+        ],
+        "configurationDefaults": {
+            "[cml]": {
+                "editor.semanticHighlighting.enabled": true
+            }
+        },
+        "keybindings": [
+            {
+                "command": "camel.vizGIR",
+                "key": "ctrl+k ctrl+g",
+                "mac": "cmd+k cmd+g",
+                "when": "editorLangId == cml && editorTextFocus"
             }
         ]
     },

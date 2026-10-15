@@ -1,3 +1,4 @@
+import { t } from '../localization'
 // Debug Adapter translating DAP to the camel-db HTTP API.
 // camel-db owns execution: this adapter spawns (launch) or connects to (attach)
 // the debugger gateway and forwards run/continue/step/restart/terminate, maps
@@ -7,7 +8,7 @@ import * as vscode from 'vscode'
 import * as child_process from 'child_process'
 import * as fs from 'fs'
 import * as path from 'path'
-import { apiGet, apiPost } from './http'
+import { apiGet, apiPost, DebugHttpError } from './http'
 
 export interface CamelLaunchArguments {
     request: 'launch' | 'attach'
@@ -103,6 +104,19 @@ export class CamelDebugSession implements vscode.DebugAdapter {
     private expectStepStop = false
     private runActive = false
     private runTerminated = false
+    private readonly unavailableEndpoints = new Set<string>()
+
+    private async post(endpoint: string, body?: unknown): Promise<any> {
+        if (this.unavailableEndpoints.has(endpoint)) throw new Error(t('This camel-db does not support {0}. Update the debugger from the same Camel build.', endpoint))
+        try { return await apiPost(this.port, endpoint, body) }
+        catch (error) {
+            if (error instanceof DebugHttpError && (error.status === 404 || error.status === 405)) {
+                this.unavailableEndpoints.add(endpoint)
+                this.sendEvent('output', { category: 'stderr', output: error.message + '\n' })
+            }
+            throw error
+        }
+    }
 
     /** Fired whenever the paused node changes; used to highlight the GIR panel. */
     onDidChangePausedNode: ((origin: number | null) => void) | null = null
@@ -174,13 +188,13 @@ export class CamelDebugSession implements vscode.DebugAdapter {
                 return
 
             case 'continue':
-                await apiPost(this.port, '/api/continue', { target: this.taskId })
+                await this.post( '/api/continue', { target: this.taskId })
                 this.respond(request, { allThreadsContinued: true })
                 return
 
             case 'next':
                 // Step over: pause at the next node of the graph we are stopped in.
-                await apiPost(this.port, '/api/step', {
+                await this.post( '/api/step', {
                     target: this.taskId,
                     graphId: this.lastPausedGraphId
                 })
@@ -190,13 +204,13 @@ export class CamelDebugSession implements vscode.DebugAdapter {
 
             case 'stepIn':
                 // Step in: pause at the next node in any graph.
-                await apiPost(this.port, '/api/step', { target: this.taskId })
+                await this.post( '/api/step', { target: this.taskId })
                 this.expectStepStop = true
                 this.respond(request, {})
                 return
 
             case 'restart':
-                await apiPost(this.port, '/api/restart', { target: this.taskId })
+                await this.post( '/api/restart', { target: this.taskId })
                 this.wasPaused = false
                 this.runActive = true
                 this.runTerminated = false
@@ -229,7 +243,7 @@ export class CamelDebugSession implements vscode.DebugAdapter {
                 return
 
             default:
-                this.respond(request, undefined, false, `Unsupported request: ${request.command}`)
+                this.respond(request, undefined, false, t("Unsupported request: {0}", request.command))
         }
     }
 
@@ -272,7 +286,7 @@ export class CamelDebugSession implements vscode.DebugAdapter {
                 verified,
                 message: verified
                     ? undefined
-                    : 'No GIR node covers this line (yet). Breakpoint activates when a node maps here.'
+                    : t("No GIR node covers this line (yet). Breakpoint activates when a node maps here.")
             }
         })
         this.lineBreakpoints.set(key, entries)
@@ -393,7 +407,7 @@ export class CamelDebugSession implements vscode.DebugAdapter {
                 entry.verified = verified
                 entry.message = verified
                     ? undefined
-                    : 'No GIR node covers this line (yet). Breakpoint activates when a node maps here.'
+                    : t("No GIR node covers this line (yet). Breakpoint activates when a node maps here.")
                 this.sendEvent('breakpoint', {
                     reason: 'changed',
                     breakpoint: {
@@ -411,7 +425,7 @@ export class CamelDebugSession implements vscode.DebugAdapter {
     private async launch(args: CamelLaunchArguments, request: { seq?: number }): Promise<void> {
         const program = args.program
         if (!program || !fs.existsSync(program)) {
-            this.respond(request, undefined, false, `launch: program "${program}" does not exist`)
+            this.respond(request, undefined, false, t("launch: program \"{0}\" does not exist", program))
             return
         }
         this.program = program
@@ -419,7 +433,7 @@ export class CamelDebugSession implements vscode.DebugAdapter {
 
         const camelDbPath = args.camelDbPath?.trim()
         if (!camelDbPath) {
-            this.respond(request, undefined, false, 'camel-db not found. Set "opencmlLanguageServer.camelDbPath" or fix camelPath.')
+            this.respond(request, undefined, false, t("camel-db not found. Set \"opencmlLanguageServer.camelDbPath\" or fix camelPath."))
             return
         }
 
@@ -432,16 +446,16 @@ export class CamelDebugSession implements vscode.DebugAdapter {
         this.camelDb.on('error', (error) => {
             this.sendEvent('output', {
                 category: 'stderr',
-                output: `Failed to start camel-db: ${error.message}\n`
+                output: t("Failed to start camel-db: {0}\n", error.message)
             })
         })
 
         await this.waitForApi()
-        const loaded = (await apiPost(this.port, '/api/file', { path: program })) as { taskId?: string }
+        const loaded = (await this.post( '/api/file', { path: program })) as { taskId?: string }
         this.taskId = loaded.taskId ?? ''
         await this.pushNodeBreakpoints()
         await this.pushAllLineBreakpoints()
-        await apiPost(this.port, '/api/run', this.taskId ? { target: this.taskId } : {})
+        await this.post( '/api/run', this.taskId ? { target: this.taskId } : {})
         this.runActive = true
         this.runTerminated = false
         this.respond(request, {})
@@ -453,7 +467,7 @@ export class CamelDebugSession implements vscode.DebugAdapter {
         try {
             await this.waitForApi()
         } catch {
-            this.respond(request, undefined, false, `attach: no camel-db answering on 127.0.0.1:${this.port}`)
+            this.respond(request, undefined, false, t("attach: no camel-db answering on 127.0.0.1:{0}", this.port))
             return
         }
         const state = (await apiGet(this.port, '/api/state')) as CamelDbState
@@ -472,7 +486,7 @@ export class CamelDebugSession implements vscode.DebugAdapter {
             return
         }
         try {
-            await apiPost(this.port, '/api/gir-breakpoints', {
+            await this.post( '/api/gir-breakpoints', {
                 target: this.taskId,
                 originIds
             })
@@ -503,7 +517,7 @@ export class CamelDebugSession implements vscode.DebugAdapter {
                 await new Promise((r) => setTimeout(r, 250))
             }
         }
-        throw new Error(`camel-db did not start on port ${this.port} within 10s`)
+        throw new Error(t("camel-db did not start on port {0} within 10s", this.port))
     }
 
     private startPolling(): void {
@@ -552,7 +566,7 @@ export class CamelDebugSession implements vscode.DebugAdapter {
                     reason,
                     threadId: 1,
                     allThreadsStopped: true,
-                    text: pausedTask.pauseReason?.phase ?? (reason === 'step' ? 'step' : 'breakpoint')
+                    text: pausedTask.pauseReason?.phase ?? (reason === 'step' ? t('Step') : t('Breakpoint'))
                 })
             } else if (!pausedTask && this.wasPaused) {
                 this.wasPaused = false
@@ -600,7 +614,7 @@ export class CamelDebugSession implements vscode.DebugAdapter {
     private async cleanupSession(): Promise<void> {
         this.stopPolling()
         try {
-            await apiPost(this.port, '/api/terminate', { target: this.taskId })
+            await this.post( '/api/terminate', { target: this.taskId })
         } catch {
             // ignore
         }

@@ -1,3 +1,4 @@
+import { t } from './localization'
 // Central place to resolve the Camel toolchain (camel / camel-ls / camel-format / camel-db)
 // from the user-configured camelPath. camelPath may point at:
 //   - the camel executable itself (e.g. .../bin/camel.exe)
@@ -29,8 +30,8 @@ function findExecutable(dir: string, base: string): string | null {
     for (const name of exeNames(base)) {
         const candidate = path.join(dir, name)
         try {
-            if (fs.existsSync(candidate)) {
-                return candidate
+            if (fs.statSync(candidate).isFile()) {
+                return path.resolve(candidate)
             }
         } catch {
             // ignore and continue
@@ -43,7 +44,7 @@ function findExecutable(dir: string, base: string): string | null {
  * Resolve the toolchain from the configured camelPath setting.
  * Never throws; unlocatable pieces come back as null plus a warning.
  */
-export function detectToolchain(camelPath: string): CamelToolchain {
+export function detectToolchain(camelPath: string, camelLsPath = ''): CamelToolchain {
     const warnings: string[] = []
     const cleaned = (camelPath || 'camel').trim() || 'camel'
     const hasSeparator = /[\\/]/.test(cleaned)
@@ -58,12 +59,12 @@ export function detectToolchain(camelPath: string): CamelToolchain {
             } else if (fs.existsSync(cleaned)) {
                 // camelPath points at the camel executable itself
                 homeDir = path.dirname(cleaned)
-            } else if (findExecutable(path.dirname(cleaned), 'camel')) {
+            } else if (findExecutable(path.dirname(cleaned), path.basename(cleaned).replace(/\.exe$/i, ''))) {
                 // e.g. user dropped the .exe suffix but the folder is right
                 homeDir = path.dirname(cleaned)
             } else {
                 warnings.push(
-                    `Configured camelPath "${cleaned}" does not exist. Fix the "opencmlLanguageServer.camelPath" setting.`
+                    t("Configured camelPath \"{0}\" does not exist. Fix the \"opencmlLanguageServer.camelPath\" setting.", cleaned)
                 )
             }
         } catch {
@@ -71,8 +72,29 @@ export function detectToolchain(camelPath: string): CamelToolchain {
         }
     }
 
+    // A default installation may only be advertised through CAMEL_HOME or PATH.
+    const searchDirs = [
+        ...(process.env.CAMEL_HOME ? [path.join(process.env.CAMEL_HOME, 'bin')] : []),
+        ...(process.env.PATH || '').split(path.delimiter).filter(Boolean).map(d => d.replace(/^"|"$/g, ''))
+    ]
+    let camel = cleaned
+    if (homeDir) {
+        camel = findExecutable(homeDir, path.basename(cleaned).replace(/\.exe$/i, ''))
+            || findExecutable(homeDir, 'camel') || cleaned
+    } else if (!hasSeparator) {
+        const dirs = cleaned === 'camel' ? searchDirs : searchDirs.filter(d => d !== path.join(process.env.CAMEL_HOME || '', 'bin'))
+        for (const dir of dirs) {
+            const found = findExecutable(dir, cleaned.replace(/\.exe$/i, ''))
+            if (found) {
+                camel = found
+                homeDir = path.dirname(found)
+                break
+            }
+        }
+    }
+
     const toolchain: CamelToolchain = {
-        camel: cleaned,
+        camel,
         camelLs: null,
         camelFormat: null,
         camelDb: null,
@@ -86,10 +108,29 @@ export function detectToolchain(camelPath: string): CamelToolchain {
         toolchain.camelDb = findExecutable(homeDir, 'camel-db')
     }
 
+    // Do not silently select another installation for an explicit camelPath.
+    if (!hasSeparator && !homeDir) {
+        for (const dir of searchDirs) {
+            toolchain.camelLs ||= findExecutable(dir, 'camel-ls')
+            toolchain.camelFormat ||= findExecutable(dir, 'camel-format')
+            toolchain.camelDb ||= findExecutable(dir, 'camel-db')
+        }
+    }
+    if (camelLsPath.trim()) {
+        const configured = camelLsPath.trim()
+        toolchain.camelLs = /[\\/]/.test(configured)
+            ? findExecutable(path.dirname(configured), path.basename(configured).replace(/\.exe$/i, ''))
+                || findExecutable(configured, 'camel-ls')
+            : searchDirs.map(d => findExecutable(d, configured.replace(/\.exe$/i, ''))).find(Boolean) || null
+        if (!toolchain.camelLs) {
+            warnings.push(t("Configured camelLsPath \"{0}\" does not exist. Fix \"opencmlLanguageServer.camelLsPath\".", configured))
+        }
+    }
+
     return toolchain
 }
 
 /** Error message shown when spawning a tool that cannot be found. */
 export function spawnHint(settingKey = 'opencmlLanguageServer.camelPath'): string {
-    return `Make sure Camel is built and on PATH, or point "${settingKey}" at the camel executable (e.g. .../out/latest/bin/camel.exe).`
+    return t("Make sure Camel is built and on PATH, or point \"{0}\" at the camel executable (e.g. .../out/latest/bin/camel.exe).", settingKey)
 }

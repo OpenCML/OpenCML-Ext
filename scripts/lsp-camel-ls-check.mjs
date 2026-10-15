@@ -1,60 +1,44 @@
-// Smoke test for camel-ls: initialize, didOpen err.cml, pull textDocument/diagnostic,
-// textDocument/formatting. Usage: node scripts/lsp-camel-ls-check.mjs [camel-ls.exe]
-import { spawn } from 'child_process'
-import fs from 'fs'
-
-const exe = process.argv[2] || 'D:/Projects/Camel/out/latest/bin/camel-ls.exe'
-const errContent = fs.readFileSync('test/test/err.cml', 'utf8')
-const errUri = 'file:///D:/Projects/OpenCML-Ext/test/test/err.cml'
-
-const server = spawn(exe, ['--stdio'], { stdio: ['pipe', 'pipe', 'inherit'] })
-
-let buffer = Buffer.alloc(0)
-let sawPush = false
-let sawPull = false
-let sawFormat = false
-
-server.stdout.on('data', (chunk) => {
-    buffer = Buffer.concat([buffer, chunk])
-    while (true) {
-        const headerEnd = buffer.indexOf('\r\n\r\n')
-        if (headerEnd === -1) return
-        const m = /Content-Length: (\d+)/i.exec(buffer.slice(0, headerEnd).toString())
-        if (!m) return
-        const len = parseInt(m[1], 10)
-        if (buffer.length < headerEnd + 4 + len) return
-        const body = buffer.slice(headerEnd + 4, headerEnd + 4 + len).toString()
-        buffer = buffer.slice(headerEnd + 4 + len)
-        const msg = JSON.parse(body)
-        if (msg.method === 'textDocument/publishDiagnostics') {
-            sawPush = true
-            console.log('UNEXPECTED_PUSH_DIAG')
-        } else if (msg.id === 2) {
-            sawPull = msg.result?.kind === 'full' && msg.result?.items?.length === 2
-            console.log('PULL_DIAG:', msg.result?.items?.length, 'item(s)')
-        } else if (msg.id === 3) {
-            const edits = msg.result || []
-            sawFormat = edits.length === 1 && edits[0].newText.includes('\n    ')
-            console.log('FORMAT:', edits.length, 'edit(s), newText head:', JSON.stringify(edits[0]?.newText?.slice(0, 40)))
-        } else if (msg.id === 1) {
-            console.log('INIT_OK caps:', Object.keys(msg.result?.capabilities || {}).join(','))
-        }
+// Real runtime contract test. Usage: node scripts/lsp-camel-ls-check.mjs [camel-ls]
+import assert from 'node:assert/strict'
+import path from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { LspClient } from './lsp-client.mjs'
+const exe = process.argv[2] || process.env.CAMEL_LS_PATH || (process.env.CAMEL_HOME ? path.join(process.env.CAMEL_HOME, 'bin', process.platform === 'win32' ? 'camel-ls.exe' : 'camel-ls') : 'camel-ls')
+const ls = new LspClient(exe, ['--stdio'])
+try {
+    const init = await ls.request('initialize', { processId: process.pid, rootUri: null, capabilities: { textDocument: { diagnostic: {} } } })
+    ls.notify('initialized', {})
+    for (const feature of ['hoverProvider', 'definitionProvider', 'referencesProvider', 'documentSymbolProvider', 'workspaceSymbolProvider', 'completionProvider', 'signatureHelpProvider', 'renameProvider', 'semanticTokensProvider', 'documentFormattingProvider']) assert.ok(init.capabilities[feature], feature)
+    const text = 'module err_function_part\n\nfunc inc(x: int): int { return x + 1 }\n\nfunc main(): int sync {\n    let fs = [inc]\n    println(fs == fs)\n    return 0\n}\n'
+    const uri = pathToFileURL(path.resolve('test/test/semantic-inc.cml')).href
+    const document = { textDocument: { uri } }
+    ls.notify('textDocument/didOpen', { textDocument: { uri, languageId: 'cml', version: 1, text } })
+    const diagnostics = await ls.request('textDocument/diagnostic', document)
+    assert.ok(diagnostics.items.some(d => d.message.includes('No matching function')), 'type error in function array comparison')
+    const tokens = await ls.request('textDocument/semanticTokens/full', document)
+    const decoded = []
+    let line = 0, column = 0
+    for (let i = 0; i < tokens.data.length; i += 5) {
+        const [dl, dc, length, type] = tokens.data.slice(i, i + 5)
+        column = dl ? dc : column + dc; line += dl
+        decoded.push({ line, column, length, type: init.capabilities.semanticTokensProvider.legend.tokenTypes[type] })
     }
-})
-
-function send(msg) {
-    const body = JSON.stringify(msg)
-    server.stdin.write(`Content-Length: ${Buffer.byteLength(body)}\r\n\r\n${body}`)
-}
-
-send({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { processId: process.pid, rootUri: null, capabilities: {}, workspaceFolders: null } })
-setTimeout(() => send({ jsonrpc: '2.0', method: 'initialized', params: {} }), 300)
-setTimeout(() => send({ jsonrpc: '2.0', method: 'textDocument/didOpen', params: { textDocument: { uri: errUri, languageId: 'cml', version: 1, text: errContent } } }), 600)
-setTimeout(() => send({ jsonrpc: '2.0', id: 2, method: 'textDocument/diagnostic', params: { textDocument: { uri: errUri } } }), 1500)
-setTimeout(() => send({ jsonrpc: '2.0', id: 3, method: 'textDocument/formatting', params: { textDocument: { uri: errUri }, options: { tabSize: 4, insertSpaces: true } } }), 2000)
-setTimeout(() => {
-    server.kill()
-    const ok = sawPull && sawFormat && !sawPush
-    console.log(ok ? 'CAMEL_LS_OK' : 'CAMEL_LS_FAILED')
-    process.exit(ok ? 0 : 1)
-}, 5000)
+    for (const [line, column] of [[2, 5], [5, 14]]) assert.ok(decoded.some(t => t.line === line && t.column === column && t.type === 'function' && t.length === 3), 'inc declaration AND function value must be function tokens, even with a type error')
+    const position = { ...document, position: { line: 5, character: 15 } }
+    assert.ok(await ls.request('textDocument/hover', position))
+    assert.ok((await ls.request('textDocument/definition', position)).length)
+    assert.ok((await ls.request('textDocument/references', { ...position, context: { includeDeclaration: true } })).length >= 2)
+    assert.ok((await ls.request('textDocument/documentSymbol', document)).length)
+    ls.notify('textDocument/didChange', { textDocument: { uri, version: 2 }, contentChanges: [{ text: text.replace('println(fs == fs)', 'println(1)').replace('[inc]', ' inc(1)') }] })
+    assert.equal((await ls.request('textDocument/diagnostic', document)).items.length, 0)
+    assert.ok(await ls.request('textDocument/prepareRename', position))
+    const rename = await ls.request('textDocument/rename', { ...position, newName: 'increment' })
+    assert.equal(rename.changes[uri].length, 2)
+    const completion = await ls.request('textDocument/completion', { ...document, position: { line: 7, character: 4 } })
+    assert.ok(completion.items.some(item => item.label === 'inc'))
+    const signature = await ls.request('textDocument/signatureHelp', { ...document, position: { line: 6, character: 12 } })
+    assert.ok(signature.signatures.length)
+    assert.ok((await ls.request('textDocument/formatting', { ...document, options: { tabSize: 4, insertSpaces: true } })).length)
+    assert.ok(!ls.notifications.some(n => n.method === 'textDocument/publishDiagnostics'), 'pull clients must not receive duplicate push diagnostics')
+    console.log('CAMEL_LS_OK: diagnostics, unsaved edits, hover, definition, references, symbols, completion, signature, rename, format, inc function tokens')
+} finally { await ls.close() }
