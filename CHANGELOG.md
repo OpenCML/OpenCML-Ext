@@ -1,8 +1,139 @@
+## 1.8.0
+
+- Add type and parameter inlay-hint preferences, applied immediately to visible editors, and localized compiler-validated typo fixes.
+- Synchronize file-system changes with the native server and preserve saved-only diagnostics during dependency refreshes.
+- With the updated Camel language server: analyze unsaved imports, refresh dependent diagnostics, find references in unopened workspace files and safely rename exported functions across files. Add call hierarchy, named type navigation, folding, selection expansion and conservative inlay hints/quick fixes.
+- Add protocol and real-editor regression coverage. These language features require the updated runtime; the bundled fallback still provides diagnostics and formatting only.
+
+## 1.7.2
+
+- Add bilingual diagnostic trigger/debounce/severity settings and a CLI check/GIR timeout.
+- Add live GIR preferences for following sources, refreshing, browsing, edge labels, hover neighborhoods and viewport restoration. Remember toolbar choices per workspace; explicit setting changes take precedence.
+- Apply the problem limit consistently to native and fallback diagnostics.
+
+## 1.7.1
+
+- Declare Camel 0.2.11 as the tested support baseline. Warn for older/unknown versions and probe actual features, allowing backported capabilities.
+- Probe CLI GIR, JSON diagnostics and graph metadata using disposable compile-only fixtures. Report LSP capabilities and reasons in Runtime Info and Health Check; gate unavailable CLI GIR and fallback features.
+- Treat debugger versions independently. Report unsupported HTTP endpoints, avoid repeated unsupported debugger requests, and disable unavailable pass-snapshot controls with a reason.
+- Test version boundaries, capability failures, temporary-file cleanup, real runtime probes, runtime health and debugger lifecycle.
+
+## 1.7.0
+
+- Localize commands, settings, debug configurations, runtime notifications, diagnostic advice and the complete GIR interface into English and Simplified Chinese.
+- Follow the VS Code display language in the extension host and webview; use English for unsupported locales. Preserve source identifiers and raw Camel output.
+- Add catalog/placeholder checks and run GIR interaction tests with both English and Chinese editor locales. Allow the toolbar to wrap in narrow panels.
+
+## 1.6.4
+
+- Render synthetic ARGS/EXIT markers as compact input/output boundary lines, with a single label and only the connected handle.
+- Explain boundary semantics in hover/details and prevent setting runtime breakpoints on these markers.
+
+## 1.6.3
+
+- Display parameter and captured-variable names on PORT nodes when supplied by Camel.
+- Display the assembled type on FILL nodes; keep the node kind beneath the title and expose full types, parameter kinds and indices in hover/details.
+- Requires a Camel build with DOT port/type metadata for complete details; older exports remain supported.
+
+## 1.6.2
+
+- GIR follows active CML source by default, with a workspace-persisted pin toggle and source-navigation protection.
+- Reuse the GIR panel with Ctrl+K Ctrl+G (Cmd+K Cmd+G on macOS); retain per-file/pass navigation and cameras within the panel session.
+- Keep the function directory visible in hierarchy mode, including entry and current-function labels.
+
 # Change Log
 
 All notable changes to the "OpenCML-Ext" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
+
+## [1.6.1] - 2026-10-15
+
+- Recognize DATA function values as graph navigation targets alongside FUNC nodes, including the root main function value.
+- Resolve unambiguous cross-level and recursive graph references. Preserve fallback cards for ambiguous names.
+- When the module has an explicit function-value CALL entry, show its entry flow without duplicate function cards; retain other top-level graphs in a compact expandable Module Functions list beside breadcrumbs.
+- Add back navigation to return from cross-level calls. Verify navigation and retained module graphs against the real perm_query_types case and the VS Code webview.
+
+## [1.6.0] - 2026-10-15
+
+- Search all GIR nodes by name, type or ID using Ctrl/Cmd+F or the status-bar Search button. Results include graph paths, navigate across hierarchy levels, center and highlight the target, and provide return-to-origin navigation. Enter/Shift+Enter cycle results; Escape closes search.
+- Shift-click a node to lock its neighborhood highlight. Choose upstream/downstream/both and one/two hops in the status bar; Escape or Unlock releases it.
+- Filter ordinary/context/control edges in display options. Unselected kinds fade by default or can be fully hidden without moving nodes. A status-bar indicator makes active filtering explicit.
+- Verify traversal cycles, direction/depth, cross-level search/return, hover lock, filter visibility and stable node positions with model and real VS Code webview tests.
+
+## [1.5.0] - 2026-10-15
+
+- Highlight direct upstream/downstream neighbors and connected edges on hover; fade unrelated nodes and restore on leave. Show counts in the existing status bar.
+- Replace repeated edge-type text with colors, solid/dashed/dotted lines and directional arrows. Reveal port indices only on edges connected to the hovered node; retain accessible type descriptions and the optional legend.
+- Enter uniquely matched child graphs by double-clicking FUNC nodes. Remove duplicate child cards while preserving cards for unreferenced or ambiguously named children; retain breadcrumb navigation.
+- Verify hover reset, edge styles/arrows, FUNC entry and ambiguous-reference fallback with model and real webview tests.
+
+## [1.4.1] - 2026-10-15
+
+- Stack only module-level graphs vertically; preserve the original Graphviz layout within functions. Hierarchical child cards are horizontal inside functions and vertical at module level.
+- Combine GIR identity, view/mode switches and actions into one compact toolbar. Keep breadcrumbs only in hierarchical mode and show the edge legend with display options.
+- Verify toolbar height, horizontal function subgraphs, nested cards and existing navigation in the VS Code webview.
+
+## [1.4.0] - 2026-10-15
+
+- Add default hierarchical GIR browsing alongside the existing flat view. Child graphs appear as compact cards with node counts; double-click to enter and use breadcrumbs to return.
+- Restore per-level camera and inspector state during navigation. New compiler output resets navigation to the module overview.
+- Preserve cross-scope connections through collapsed graph cards and external input/output boundary nodes, retaining edge kinds and port indices.
+- Keep ordinary node source navigation and breakpoint interactions, and verify nested navigation, camera restoration and boundary projection with model and real VS Code webview tests.
+
+## [1.3.3] - 2026-10-15
+
+- Render GIR WITH/WITH_PORT context inputs as accented dashed lines, NORM/NORM_PORT ordinary inputs as solid lines, and CTRL dependencies as dotted lines.
+- Label input kinds explicitly while preserving port indices, and add a compact legend explaining output/input indices.
+- Verify edge labels and rendered line styles in the VS Code webview regression suite.
+
+## [1.3.2] - 2026-10-15
+
+- Fix GIR source navigation when native LSP output retains DOT-escaped Windows temporary paths. Map only matching source attributes back to the original editor document; preserve imported library paths.
+- Handle the same escaped-path mapping for CLI-generated GIR and open source locations in the existing source editor group.
+- Validate source mapping, exact jump positions and preservation of unsaved buffers in the real VS Code webview. Current runtime source spans are available in rgir.
+
+## [1.3.1] - 2026-10-15
+
+- Stack sibling GIR graphs vertically by default, including nested subgraphs, with centered groups and resized containing boxes. Preserve each graph's direct-node layout and connections.
+- Add a persisted vertical/original layout selector in display options. Vertical mode opens at a readable width-fit scale; Fit still shows the complete graph.
+- Verify nested graph spacing, layout switching and unchanged raw GIR in the VS Code webview regression suite.
+
+## [1.3.0] - 2026-10-15
+
+- Add a Camel status-bar entry showing the active native LSP, CLI fallback, startup failure and stopped states. Its menu opens runtime checks, restarts the server or opens path settings.
+- Add **Camel: Runtime Info and Health Check**: actual executable paths, CLI/LSP versions, startup and version-probe failures, tool availability, environment search roots and mixed-installation warnings.
+- Display compiler suggestions in diagnostics and offer **View Camel repair suggestion** through Quick Fix. Suggestions remain advisory; no guessed source edits are applied.
+- Save modified open Camel files in the current workspace before running, including the active file and open dependencies. Cancel execution if saving fails or a saved buffer changes again, and prevent overlapping runs.
+- Remove automatic changes to workspace spell-checker settings.
+- Verify these flows in a real VS Code extension host, including invalid-server and fallback configurations.
+
+## [1.2.4] - 2026-10-15
+
+- Preserve Graphviz node centers when limiting displayed width and height. Long function-value nodes now align with their CALL nodes instead of shifting left and bending the connecting edge.
+- Add a real webview regression check for Function-to-CALL center alignment.
+
+## [1.2.3] - 2026-10-15
+
+- Treat opened source files as editable modules: suppress only `EntryModuleMissingMain` (`0x0300001B`) in editor diagnostics, including native push/pull reports and the CLI fallback. Other syntax and semantic errors remain visible. Running a file still enforces the runtime's entry-point requirements.
+- Add regression coverage for valid libraries without `main`, real errors in library code, and clearing errors after edits.
+
+## [1.2.2] - 2026-10-15
+
+- Fix blank GraphIR panels: resolve bundled scripts/styles relative to the panel HTML.
+- Redesign the panel with a compact toolbar, theme-aware nodes, collapsible options, zoom controls, text line numbers and dismissible node details.
+- Add graph/text switching, copy GIR and open GIR in an editor, with matching compiler output in both views.
+- Add editor title and context-menu entry points, and keep source and graph side by side.
+- Use `camel/graph` for current editor contents; CLI style variants also compile unsaved contents. Show compilation errors and discard stale responses.
+- Add a real VS Code webview rendering test covering nodes, view switching, copy, editor export, unsaved buffers and compiler errors.
+
+## [1.2.1] - 2026-10-15
+
+- Resolve Camel tools through `CAMEL_HOME` and `PATH`, and correctly handle a configured `bin` directory. Add an explicit `camelLsPath` override.
+- Enable CML semantic highlighting, including function references used as values (`[inc]`), with token scopes for current camel-ls.
+- Restart the language server after toolchain path changes and add **Camel: Restart Language Server**; surface startup errors and resynchronize open documents.
+- Keep CLI fallback diagnostics when the compiler exits nonzero, retain error codes and suggestions, honor the problem limit, and support push-only clients. Remove demo hover, signature and TypeScript/JavaScript completion providers.
+- Add native protocol, tool discovery, fallback and VS Code language-feature regression tests.
 
 ## [1.2.0] - 2026-10-02
 
