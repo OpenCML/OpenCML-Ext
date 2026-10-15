@@ -10,6 +10,9 @@ export interface FlowNode {
         label: string
         nodeType: string
         role?: string
+        enterScope?: string
+        collapsed?: boolean
+        count?: number
         attrs: Record<string, string>
         width: number
         height: number
@@ -77,7 +80,7 @@ function sizeOf(obj: GvObject): { width: number; height: number } {
     return { width: 80, height: 40 }
 }
 
-export function buildFlowModel(dot: DotGraph, gv: GvJson): FlowModel {
+export function buildFlowModel(dot: DotGraph, gv: GvJson, arrangement: 'original' | 'vertical' = 'original'): FlowModel {
     const bb = parseBb(gv.bb)
     // graphviz y axis grows upward; Vue Flow grows downward
     const flip = (y: number) => bb.y1 - y
@@ -85,6 +88,7 @@ export function buildFlowModel(dot: DotGraph, gv: GvJson): FlowModel {
     const nodes: FlowNode[] = []
     const edges: FlowEdge[] = []
     const nodeIds = new Set<string>()
+    const pendingEdges: { scope: string; edge: DotSubgraph["edges"][number] }[] = []
 
     const gvFind = (name: string): GvObject | undefined => (gv.objects ?? []).find((o) => o.name === name)
 
@@ -119,41 +123,81 @@ export function buildFlowModel(dot: DotGraph, gv: GvJson): FlowModel {
             const key = scope ? `${scope}/${node.id}` : node.id
             const gvObj = gvFind(node.id)
             const c = gvObj ? centerOf(gvObj) : { x: 0, y: 0 }
-            const s = gvObj ? sizeOf(gvObj) : { width: 80, height: 40 }
+            const measured = gvObj ? sizeOf(gvObj) : { width: 80, height: 40 }
+            // Graphviz positions are centers. Apply display limits before converting
+            // to top-left, otherwise long labels shift the node and its edge handles.
+            const s = { width: Math.min(measured.width, 220), height: Math.min(measured.height, 80) }
+            if (node.attrs.type === 'ARGS' || node.attrs.type === 'EXIT') {
+                s.width = 64
+                s.height = 24
+            }
             nodeIds.add(key)
             nodes.push({
                 id: key,
                 position: topLeft({ x: c.x, y: flip(c.y) }, s),
                 type: 'gir',
                 data: {
-                    label: node.attrs.label ?? node.id,
+                    label: (node.attrs.type === 'PORT' || node.attrs.type === 'CLOSURE_PORT')
+                        ? node.attrs.param_name || node.attrs.label || node.id
+                        : node.attrs.type === 'FILL' ? node.attrs.value_type || node.attrs.label || node.id
+                        : node.attrs.label ?? node.id,
                     nodeType: node.attrs.type ?? 'NODE',
                     role: node.attrs.role,
                     attrs: node.attrs,
-                    width: Math.min(s.width, 220),
-                    height: Math.min(s.height, 80)
+                    width: s.width,
+                    height: s.height
                 }
             })
         }
 
-        for (const edge of sub.edges) {
-            const src = scope ? `${scope}/${edge.from}` : edge.from
-            const dst = scope ? `${scope}/${edge.to}` : edge.to
-            if (!nodeIds.has(src) || !nodeIds.has(dst)) continue
-            edges.push({
-                id: `${src}->${dst}#${edges.length}`,
-                source: src,
-                target: dst,
-                label: edge.attrs.label,
-                edgeType: edge.attrs.type ?? ''
-            })
-        }
+        for (const edge of sub.edges) pendingEdges.push({ scope, edge })
     }
 
     walk(dot, '')
+    const resolveNode = (scope: string, id: string) => {
+        const scoped = scope ? `${scope}/${id}` : id
+        if (nodeIds.has(scoped)) return scoped
+        const matches = [...nodeIds].filter(key => key === id || key.endsWith('/' + id))
+        return matches.length === 1 ? matches[0] : undefined
+    }
+    for (const { scope, edge } of pendingEdges) {
+        const source = resolveNode(scope, edge.from), target = resolveNode(scope, edge.to)
+        if (!source || !target) continue
+        edges.push({ id: `${source}->${target}#${edges.length}`, source, target, label: edge.attrs.label, edgeType: edge.attrs.type ?? '' })
+    }
+
+    if (arrangement === 'vertical') stackGraphs(dot, nodes)
 
     // clusters first so they render below member nodes
     nodes.sort((a, b) => (a.type === b.type ? 0 : a.type === 'cluster' ? -1 : 1))
 
     return { nodes, edges }
+}
+
+// Only stack module-level graphs. Each complete function subtree moves as a
+// single unit, preserving Graphviz's internal positions and container sizes.
+function stackGraphs(dot: DotGraph, nodes: FlowNode[]) {
+    const groups = dot.subgraphs.map(child => {
+        const id = child.id ?? 'cluster'
+        return nodes.filter(node => node.id === id || node.id.startsWith(id + '/'))
+    })
+    const local = nodes.filter(node => !node.id.includes('/') && node.type !== 'cluster')
+    if (local.length) groups.push(local)
+    const content = groups.filter(group => group.length)
+    const bounds = (group: FlowNode[]) => {
+        const x = Math.min(...group.map(n => n.position.x))
+        const y = Math.min(...group.map(n => n.position.y))
+        return { x, y, width: Math.max(...group.map(n => n.position.x + n.data.width)) - x,
+            height: Math.max(...group.map(n => n.position.y + n.data.height)) - y }
+    }
+    const width = Math.max(0, ...content.map(group => bounds(group).width))
+    let y = 0
+    for (const group of content) {
+        const box = bounds(group)
+        for (const node of group) node.position = {
+            x: node.position.x + (width - box.width) / 2 - box.x,
+            y: node.position.y + y - box.y
+        }
+        y += box.height + 48
+    }
 }
