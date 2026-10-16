@@ -1,3 +1,7 @@
+## 1.12.1
+
+- Mark the paused GIR node with an external execution arrow and outer frame instead of a yellow fill. Preserve category colors, selection borders and separate breakpoint outlines, including diamond control nodes.
+
 ## 1.12.0
 
 - Add Run with Passes and Debug GIR Passes beside the editor Run icon and in the command palette. Accept ordered pass sequences or pasted Camel commands without editing launch.json; remember the pipeline per workspace.

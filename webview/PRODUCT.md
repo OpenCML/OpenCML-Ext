@@ -33,6 +33,10 @@ square diamonds with the normal node font size; GATE/SYNC use amber-tinted
 44×26 rectangles. Show the kind once with no duplicated subtitle or dot. LOOP keeps
 a compact rectangle for its navigation controls. Plain values stay neutral. Derive families from runtime kinds and function metadata;
 retain node dimensions, visible edge handles, loop actions and distinct debugger state cues.
+The paused node retains its category background and border. Mark execution with a dedicated
+left arrow badge and an outer execution-colored frame (a matching outer diamond for BRCH/JOIN).
+Keep selection on the inner border and red breakpoint outlines outside the execution frame.
+Do not recolor paused nodes with warning/yellow fills or shift layout when stepping.
 DATA nodes omit unused input handles. Determine inputs from full-graph and projected edges,
 including context/control dependencies; keep connected handles visible during navigation.
 Literal DATA text follows the current theme's Camel TextMate colors and user overrides.

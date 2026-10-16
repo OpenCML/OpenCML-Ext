@@ -1,5 +1,6 @@
 // English source messages and Simplified Chinese translations. Keep placeholders identical.
 export const zh: Record<string, string> = {
+    "Current execution node": "当前执行节点",
     "$(warning) Camel · Limited": "$(warning) Camel · 部分支持",
     "Could not query Camel version: {0}": "无法查询 Camel 版本：{0}",
     "Camel {0} is below the supported baseline {1}. Features are checked individually; upgrade for supported operation.": "Camel {0} 低于支持基线 {1}，将逐项检测功能；建议升级到受支持版本。",
