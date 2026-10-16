@@ -1,67 +1,81 @@
 {
     "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
-    "name": "OpenCML",
+    "name": "Camel",
+    "scopeName": "source.cml",
     "patterns": [
         {
-            "include": "#keywords"
+            "include": "#comments"
         },
         {
             "include": "#strings"
         },
         {
-            "include": "#comments"
+            "include": "#declarations"
         },
         {
-            "include": "#numerics"
+            "include": "#keywords"
         },
         {
-            "include": "#structures"
+            "include": "#annotations"
         },
         {
-            "include": "#supports"
+            "include": "#types"
         },
         {
-            "include": "#identifiers"
+            "include": "#calls"
         },
         {
-            "include": "#punctuations"
+            "include": "#names"
+        },
+        {
+            "include": "#operators"
+        },
+        {
+            "include": "#punctuation"
         }
     ],
     "repository": {
-        "keywords": {
+        "comments": {
             "patterns": [
                 {
-                    "name": "entity.name.type.numeric.cml",
-                    "match": "\\b(int|long|i32|i64|float|double|f32|f64|number)\\b"
+                    "name": "comment.line.documentation.cml",
+                    "match": "///(?!/)[^\\r\\n\\f]*"
                 },
                 {
-                    "name": "entity.name.type.prime.cml",
-                    "match": "\\b(string|bool|char|any|void|functor)\\b"
+                    "name": "comment.line.double-slash.cml",
+                    "match": "//[^\\r\\n\\f]*"
                 },
                 {
-                    "name": "constant.language.cml",
-                    "match": "\\b(null|true|false)\\b"
+                    "name": "comment.line.number-sign.cml",
+                    "match": "#[^\\r\\n\\f]*"
                 },
                 {
-                    "name": "keyword.control.cml",
-                    "match": "\\b(as|is|of|let|var|use|from|func|type|enum|with|wait|try|catch|finally|throw|raise|return|module|import|export|typeas|typeof|if|then|else|match|case|for|in)\\b"
-                },
-                {
-                    "name": "storage.modifier.cml",
-                    "match": "\\b(sync|macro|inner|outer|atomic|shared)\\b"
+                    "name": "comment.block.cml",
+                    "begin": "/\\*",
+                    "end": "\\*/"
                 }
             ]
         },
         "strings": {
             "patterns": [
                 {
+                    "name": "string.quoted.triple.double.cml",
+                    "begin": "\"\"\"",
+                    "end": "\"\"\""
+                },
+                {
+                    "name": "string.quoted.triple.single.cml",
+                    "begin": "'''",
+                    "end": "'''"
+                },
+                {
                     "name": "string.quoted.double.cml",
                     "begin": "\"",
                     "end": "\"",
                     "patterns": [
                         {
-                            "name": "character.escape.cml",
-                            "match": "\\\\."
+                            "name": "constant.character.escape.cml",
+                            "match": "\\\\(?:x[0-9a-fA-F]{2}|.)"
                         }
                     ]
                 },
@@ -71,178 +85,201 @@
                     "end": "'",
                     "patterns": [
                         {
-                            "name": "character.escape.cml",
-                            "match": "\\\\."
+                            "name": "constant.character.escape.cml",
+                            "match": "\\\\(?:x[0-9a-fA-F]{2}|.)"
                         }
                     ]
                 },
                 {
-                    "name": "string.quoted.single.cml",
+                    "name": "string.quoted.backtick.cml",
                     "begin": "`",
                     "end": "`",
                     "patterns": [
                         {
-                            "name": "character.escape.cml",
-                            "match": "\\\\."
+                            "name": "constant.character.escape.cml",
+                            "match": "\\\\(?:x[0-9a-fA-F]{2}|.)"
+                        }
+                    ]
+                }
+            ]
+        },
+        "declarations": {
+            "patterns": [
+                {
+                    "name": "meta.function.declaration.cml",
+                    "begin": "\\b(func)\\b",
+                    "beginCaptures": {
+                        "1": {
+                            "name": "storage.type.function.cml"
+                        }
+                    },
+                    "end": "(?=\\()|(?=[{};])",
+                    "patterns": [
+                        {
+                            "include": "#comments"
                         },
                         {
-                            "begin": "\\$\\{",
-                            "beginCaptures": {
-                                "0": {
-                                    "name": "punctuation.section.embedded.begin.cml"
+                            "match": "\\b(operator)\\b[ \\t]+(\\[\\]|[^\\w\\s(){};]+)(?=[ \\t]*\\()",
+                            "captures": {
+                                "1": {
+                                    "name": "keyword.other.operator.cml"
+                                },
+                                "2": {
+                                    "name": "entity.name.function.operator.cml"
                                 }
-                            },
-                            "end": "\\}",
-                            "endCaptures": {
-                                "0": {
-                                    "name": "punctuation.section.embedded.end.cml"
-                                }
-                            },
-                            "name": "meta.interpolation.cml",
-                            "patterns": [
-                                {
-                                    "include": "source.cml"
-                                }
-                            ]
+                            }
+                        },
+                        {
+                            "name": "entity.name.function.cml",
+                            "match": "\\b[A-Za-z_][A-Za-z_0-9]*(?:::[A-Za-z_][A-Za-z_0-9]*)*\\b"
                         }
                     ]
                 },
                 {
-                    "name": "string.quoted.triple.cml",
-                    "begin": "\"\"\"",
-                    "end": "\"\"\""
+                    "match": "\\b(type|enum)\\b[ \\t]+([A-Za-z_][A-Za-z_0-9]*(?:::[A-Za-z_][A-Za-z_0-9]*)*)",
+                    "captures": {
+                        "1": {
+                            "name": "storage.type.cml"
+                        },
+                        "2": {
+                            "name": "entity.name.type.cml"
+                        }
+                    }
                 },
                 {
-                    "name": "string.quoted.triple.cml",
-                    "begin": "'''",
-                    "end": "'''"
-                },
-                {
-                    "name": "string.quoted.triple.cml",
-                    "begin": "```",
-                    "end": "```"
+                    "match": "\\b(namespace|module)\\b[ \\t]+([A-Za-z_][A-Za-z_0-9]*(?:::[A-Za-z_][A-Za-z_0-9]*)*)",
+                    "captures": {
+                        "1": {
+                            "name": "keyword.declaration.cml"
+                        },
+                        "2": {
+                            "name": "entity.name.namespace.cml"
+                        }
+                    }
                 }
             ]
         },
-        "comments": {
+        "keywords": {
             "patterns": [
                 {
-                    "name": "comment.line.double-slash.cml",
-                    "match": "//.*$"
+                    "name": "keyword.declaration.cml",
+                    "match": "\\b(?:let|var|from|func|type|with|module|import|export|using|namespace)\\b"
                 },
                 {
-                    "name": "comment.line.number-sign.cml",
-                    "match": "# .*$"
+                    "name": "keyword.control.cml",
+                    "match": "\\b(?:wait|return|if|then|else|match|case|for|in|throw|loop|while|do|sync|macro)\\b"
                 },
                 {
-                    "name": "comment.block.documentation.cml",
-                    "begin": "/\\*",
-                    "end": "\\*/"
+                    "name": "keyword.operator.word.cml",
+                    "match": "\\b(?:as|const|typeas)\\b"
+                },
+                {
+                    "name": "constant.language.cml",
+                    "match": "\\b(?:null|true|false)\\b"
+                },
+                {
+                    "name": "keyword.other.reserved.cml",
+                    "match": "\\b(?:is|enum|keyof|typeof|of|try|catch|finally|inner|outer|atomic|shared)\\b"
                 }
             ]
         },
-        "numerics": {
+        "annotations": {
             "patterns": [
+                {
+                    "match": "(^[ \\t]*)(@)([A-Za-z_][A-Za-z_0-9]*(?:::[A-Za-z_][A-Za-z_0-9]*)*)",
+                    "captures": {
+                        "2": {
+                            "name": "punctuation.definition.annotation.cml"
+                        },
+                        "3": {
+                            "name": "entity.name.function.annotation.cml"
+                        }
+                    }
+                }
+            ]
+        },
+        "types": {
+            "patterns": [
+                {
+                    "name": "support.type.cml",
+                    "match": "\\b(?:int|i32|i64|float|f32|f64|bool|string|void|Map|Set)\\b"
+                }
+            ]
+        },
+        "calls": {
+            "patterns": [
+                {
+                    "match": "(\\?->|->|\\?\\.\\.|\\.\\.)([ \\t]*)([A-Za-z_][A-Za-z_0-9]*(?:::[A-Za-z_][A-Za-z_0-9]*)*)",
+                    "captures": {
+                        "1": {
+                            "name": "keyword.operator.cml"
+                        },
+                        "3": {
+                            "name": "entity.name.function.cml"
+                        }
+                    }
+                },
+                {
+                    "name": "entity.name.function.cml",
+                    "match": "\\b[A-Za-z_][A-Za-z_0-9]*\\b(?=\\()"
+                }
+            ]
+        },
+        "names": {
+            "patterns": [
+                {
+                    "name": "entity.name.namespace.cml",
+                    "match": "\\b[A-Za-z_][A-Za-z_0-9]*\\b(?=::)"
+                },
+                {
+                    "name": "variable.parameter.cml",
+                    "match": "\\b[A-Za-z_][A-Za-z_0-9]*\\b(?=[ \\t]*:(?!:))"
+                },
+                {
+                    "name": "constant.language.wildcard.cml",
+                    "match": "\\b_\\b"
+                },
+                {
+                    "name": "constant.numeric.hex.cml",
+                    "match": "\\b0x[0-9a-fA-F]+\\b"
+                },
+                {
+                    "name": "constant.numeric.binary.cml",
+                    "match": "\\b0b[01]+\\b"
+                },
                 {
                     "name": "constant.numeric.real.cml",
-                    "match": "(\\-|\\+)?[\\d]+\\.[\\d]+(e(\\-|\\+)?[\\d]+)?"
+                    "match": "\\b(?:[0-9]+\\.[0-9]+(?:[eE][+-]?[0-9]+)?|[0-9]+[eE][+-]?[0-9]+)\\b"
                 },
                 {
                     "name": "constant.numeric.integer.cml",
-                    "match": "(\\-|\\+)?[\\d]+(e(\\-|\\+)?[\\d]+)?"
+                    "match": "\\b[0-9]+\\b"
+                },
+                {
+                    "name": "variable.other.cml",
+                    "match": "\\b[A-Za-z_][A-Za-z_0-9]*\\b"
                 }
             ]
         },
-        "identifiers": {
+        "operators": {
             "patterns": [
                 {
-                    "name": "variable.cml",
-                    "match": "\\b[a-zA-Z_]\\w*\\b"
+                    "name": "keyword.operator.cml",
+                    "match": "!==|\\?->|\\?\\.\\.|\\.\\.\\.|===|-=|->|!!|!=|\\?\\?|\\.\\.|@=|\\*=|/=|&&|&=|%=|\\^=|\\+=|<=|==|=>|>=|\\|=|\\|\\||-|!|\\?|@|\\*|/|\\\\|&|%|\\^|\\+|<|=|>|\\||~"
                 }
             ]
         },
-        "punctuations": {
+        "punctuation": {
             "patterns": [
                 {
-                    "name": "variable.parameter.separator.cml",
-                    "match": "[\\?|\\(\\)\\{\\}\\[\\]<>;,=:@]"
+                    "name": "punctuation.separator.cml",
+                    "match": "::|[,:;.]"
                 },
                 {
-                    "name": "variable.parameter.operator.cml",
-                    "match": "\\.\\.\\.|\\.|\\.\\.|->|\\?.|\\?..|\\?->|=>|\\+|\\-|\\*|/|\\^|%|\\||&|\\||\\|\\||&&|>=|<=|==|!=|===|!==|\\*=|/=|%=|\\+=|-="
-                }
-            ]
-        },
-        "structures": {
-            "patterns": [
-                {
-                    "name": "entity.name.function.cml",
-                    "match": "(?<=\\bfunc\\b\\s+)[a-zA-Z_]\\w*"
-                },
-                {
-                    "name": "entity.name.type.cml",
-                    "match": "(?<=\\btype\\b\\s+)[a-zA-Z_]\\w*"
-                },
-                {
-                    "name": "entity.name.type.cml",
-                    "match": "(?<=\\benum\\b\\s+)[a-zA-Z_]\\w*"
-                },
-                {
-                    "name": "entity.name.type.cml",
-                    "match": "(?<=:\\s*)(?<!::\\s*)([a-zA-Z_])(?![:\\]])\\w*"
-                },
-                {
-                    "name": "entity.name.type.cml",
-                    "match": "(?<=as\\s*)[a-zA-Z_]\\w*"
-                },
-                {
-                    "name": "entity.name.type.cml",
-                    "match": "(?<=typeas\\s*)[a-zA-Z_]\\w*"
-                },
-                {
-                    "name": "entity.name.type.cml",
-                    "match": "(?<=\\([^()]+\\)\\s*=>\\s*:\\s*)[^\\s]+\\w*"
-                }
-            ]
-        },
-        "supports": {
-            "patterns": [
-                {
-                    "name": "support.function.io.cml",
-                    "match": "(?<=(?:->|\\.\\.)\\s*(?:\\w+::)*)\\b[a-zA-Z_]\\w*\\b(?!::)"
-                },
-                {
-                    "name": "support.function.io.cml",
-                    "match": "([a-zA-Z_]\\w*)(?=\\.\\.)"
-                },
-                {
-                    "name": "support.function.io.cml",
-                    "match": "\\b[a-zA-Z_]\\w*(?=<[^>]*>|\\(.*\\))"
-                }
-            ]
-        },
-        "inners": {
-            "patterns": [
-                {
-                    "include": "#keywords"
-                },
-                {
-                    "include": "#strings"
-                },
-                {
-                    "include": "#numerics"
-                },
-                {
-                    "include": "#supports"
-                },
-                {
-                    "include": "#identifiers"
-                },
-                {
-                    "include": "#punctuations"
+                    "name": "punctuation.section.cml",
+                    "match": "[()\\[\\]{}]"
                 }
             ]
         }
-    },
-    "scopeName": "source.cml"
+    }
 }

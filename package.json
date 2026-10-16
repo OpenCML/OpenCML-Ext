@@ -2,7 +2,7 @@
     "name": "open-cml-extension",
     "displayName": "OpenCML-Ext",
     "description": "%description%",
-    "version": "1.8.0",
+    "version": "1.8.1",
     "publisher": "Kogler7",
     "icon": "assets/icon.jpg",
     "type": "module",
@@ -11,7 +11,8 @@
         "pub": "node ./publish.js",
         "test:i18n": "node scripts/localization-test.mjs",
         "test:compatibility": "node scripts/compatibility-test.mjs",
-        "test:lsp": "node scripts/toolchain-test.mjs && node scripts/lsp-smoke-test.mjs && node scripts/lsp-camel-ls-check.mjs && node test/lsp-workspace.mjs"
+        "test:lsp": "node scripts/toolchain-test.mjs && node scripts/lsp-smoke-test.mjs && node scripts/lsp-camel-ls-check.mjs && node test/lsp-workspace.mjs",
+        "test:grammar": "node scripts/grammar-test.mjs"
     },
     "engines": {
         "vscode": "^1.82.0"
@@ -438,7 +439,9 @@
         "@types/jest": "^30.0.0",
         "@vscode/vsce": "^3.6.0",
         "postinstall-postinstall": "^2.1.0",
-        "typescript": "^5.8.3"
+        "typescript": "^5.8.3",
+        "vscode-oniguruma": "^2.0.1",
+        "vscode-textmate": "^9.3.2"
     },
     "packageManager": "yarn@4.9.4"
 }

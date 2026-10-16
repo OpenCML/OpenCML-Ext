@@ -1,3 +1,10 @@
+## 1.8.1
+
+- Refresh Camel TextMate highlighting against the current runtime token table: namespaces, loops, reserved words, operators, qualified declarations, calls, annotations, numeric literals and comments.
+- Fix multiline string precedence, remove unsupported interpolation guesses and replace variable-length lookbehinds. Basic highlighting works without the language server; bare function references still require semantic tokens.
+- Stop automatically closing or indenting Camel comparisons as angle brackets. Remove legacy PSL language registration and syntax assets.
+- Add real TextMate/Oniguruma regression tests and a script to check keyword/operator drift against a Camel source checkout.
+
 ## 1.8.0
 
 - Add type and parameter inlay-hint preferences, applied immediately to visible editors, and localized compiler-validated typo fixes.
