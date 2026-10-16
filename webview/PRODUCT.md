@@ -33,6 +33,8 @@ Avoid diamonds and oversized control geometry. GATE/BRCH/JOIN/SYNC are single-li
 markers, showing the kind once with no duplicated subtitle or dot. LOOP keeps
 a compact rectangle for its navigation controls. Plain values stay neutral. Derive families from runtime kinds and function metadata;
 retain node dimensions, visible edge handles, loop actions and distinct debugger state cues.
+DATA nodes omit unused input handles. Determine inputs from full-graph and projected edges,
+including context/control dependencies; keep connected handles visible during navigation.
 
 The secondary memory panel follows the selected native debug session. Read an aggregate once
 on first paused open, then refresh explicitly; invalidate old heap responses on stop/session

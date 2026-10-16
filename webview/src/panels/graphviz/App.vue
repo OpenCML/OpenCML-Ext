@@ -356,13 +356,15 @@ function edgeLabel(edge: FlowEdge): string {
 }
 
 function toVueFlow(model: { nodes: FlowNode[]; edges: FlowEdge[] }): { nodes: Node[]; edges: Edge[] } {
+    // Include full-graph inputs and projected boundary edges, regardless of edge kind.
+    const incoming = new Set([...fullModel.value.edges, ...model.edges].map(edge => edge.target))
     return {
         nodes: decorate(
             model.nodes.map((n) => ({
                 id: n.id,
                 type: n.type,
                 position: n.position,
-                data: { ...n.data },
+                data: { ...n.data, hasIncoming: incoming.has(n.id) },
                 draggable: false,
                 connectable: false,
                 selectable: n.type !== 'cluster'

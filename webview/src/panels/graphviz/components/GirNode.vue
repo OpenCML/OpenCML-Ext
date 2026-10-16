@@ -17,6 +17,7 @@ export interface GirNodeData {
     height: number
     breakpoint?: boolean
     paused?: boolean
+    hasIncoming?: boolean
 }
 
 const props = defineProps<{
@@ -71,7 +72,7 @@ const nodeTitle = computed(() => {
             <div class="gir-label" :title="nodeTitle"><PanelIcon v-if="family === 'function'" name="function" class="function-symbol" :size="12" />{{ boundary ? (data.nodeType === 'ARGS' ? t("Input") : t("Output")) : data.label }}</div>
             <div v-if="!boundary" class="gir-type">{{ functionValue ? t("Function value") : data.nodeType }}<span v-if="data.enterScope" :aria-label='t("Open subgraph")'>↗</span></div>
         </template>
-        <Handle v-if="data.nodeType !== 'ARGS'" id="t" type="target" :position="Position.Top" />
+        <Handle v-if="data.nodeType !== 'ARGS' && (data.nodeType !== 'DATA' || data.hasIncoming !== false)" id="t" type="target" :position="Position.Top" />
         <Handle v-if="data.nodeType !== 'EXIT'" id="s" type="source" :position="Position.Bottom" />
     </div>
 </template>

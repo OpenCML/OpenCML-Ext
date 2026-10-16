@@ -1,3 +1,7 @@
+## 1.11.7
+
+- Hide unused top handles on DATA nodes. Preserve handles for actual incoming edges of every kind, including full-graph and projected hierarchy connections.
+
 ## 1.11.6
 
 - Give operations a small corner radius. Render GATE/BRCH/JOIN/SYNC as compact single-line 44×26 labels without repeating the kind.

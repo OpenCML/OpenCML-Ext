@@ -155,6 +155,9 @@ exports.run = async (vscode, workspace) => {
         assert.equal(await frame.locator('.family-operation .function-symbol, .family-value .function-symbol').count(), 0)
         assert.equal(await frame.locator('.family-operation').count(), 2)
         assert.equal(await frame.locator('.family-value').count(), 3)
+        assert.equal(await frame.locator('.t-data [data-handleid="t"]').count(), 0, 'source DATA should not render an unused input handle')
+        assert.equal(await frame.locator('.t-data [data-handleid="s"]').count(), 3)
+        assert.equal(await frame.locator('.t-func [data-handleid="t"]').count(), 1)
         await frame.getByRole('button', { name: label('Fit to view'), exact: true }).click()
         await frame.page().screenshot({ path: path.join(workspace.uri.fsPath, 'gir-node-families-light.png') })
         await vscode.workspace.getConfiguration('workbench').update('colorTheme', 'Default Dark Modern', vscode.ConfigurationTarget.Workspace)
@@ -162,6 +165,8 @@ exports.run = async (vscode, workspace) => {
         await frame.page().screenshot({ path: path.join(workspace.uri.fsPath, 'gir-node-families-dark.png') })
         await vscode.workspace.getConfiguration('workbench').update('colorTheme', 'Default Light Modern', vscode.ConfigurationTarget.Workspace)
         await frame.waitForFunction(() => document.body.classList.contains('vscode-light'))
+        await frame.evaluate(dot => window.dispatchEvent(new MessageEvent('message', { data: { command: 'render', dot } })), families.replace('n -> f', 'z -> s [type="CTRL"]; n -> f'))
+        await frame.waitForFunction(() => document.querySelectorAll('.t-data [data-handleid="t"]').length === 1)
         const fixture = 'digraph G { subgraph cluster_a { label="A"; a [label="ARGS"]; b [label="EXIT"]; a -> b [label="0|0", type="WITH"]; } subgraph cluster_b { label="B"; subgraph cluster_c { c [label="DATA"]; d [label="EXIT"]; c -> d [label="0|0", type="NORM"]; } subgraph cluster_d { e [label="DATA"]; f [label="EXIT"]; e -> f [label="0|0", type="CTRL"]; } g [label="CALL"]; h [label="EXIT"]; g -> h [label="0", type="WITH_PORT"]; } }'
         await frame.evaluate(dot => window.dispatchEvent(new MessageEvent('message', { data: { command: 'render', dot } })), fixture)
         await frame.getByRole('button', { name: label("Display options"), exact: true }).click()
