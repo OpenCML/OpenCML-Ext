@@ -26,8 +26,13 @@ export function loopDetails(model: FlowModel, node: FlowNode): LoopDetails | und
     if (node.data.nodeType !== 'LOOP') return undefined
     // Full-styling DOT shortens labels but retains the complete label in its tooltip.
     const label = [node.data.attrs.tooltip, node.data.label].find(text => /^LOOP (while|for(?:-while)?)\b/.test(text || '')) || ''
-    const kind = /^LOOP (while|for-while|for)\b/.exec(label)?.[1] || 'loop'
+    const kind = node.data.attrs.loop_kind || /^LOOP (while|for-while|for)\b/.exec(label)?.[1] || 'loop'
     const link = (role: string): GraphLink | undefined => {
+        if (node.data.attrs.jgir) {
+            const scope = node.data.attrs[role === 'body' ? 'loop_body' : 'loop_condition']
+            const graph = model.nodes.find(n => n.type === 'cluster' && n.id === scope)
+            return graph ? { name: graph.data.label, scope } : undefined
+        }
         const name = new RegExp(`\\b${role}=([^\\s]+)`).exec(label)?.[1]
         return name ? { name, scope: resolveGraphName(model, node, name) } : undefined
     }

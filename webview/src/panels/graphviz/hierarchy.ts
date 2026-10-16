@@ -8,6 +8,7 @@ export function parentScope(id: string): string { return id.slice(0, Math.max(0,
 // Resolve only unambiguous references; never guess among duplicate graph names.
 export function graphTarget(model: FlowModel, node: FlowNode): string | undefined {
     if (node.type !== 'gir') return undefined
+    if (node.data.attrs.jgir) return node.data.attrs.callee_scope
     const name = node.data.nodeType === 'FUNC' ? node.data.label : node.data.nodeType === 'DATA'
         ? /^Function\(graph=([^,]+), tupleSlots=/.exec(node.data.label)?.[1] : undefined
     if (!name) return undefined

@@ -37,13 +37,13 @@ Open a `.cml` file and use the graph button in the editor title, the editor cont
 - **模块函数**: modules with an explicit entry show the entry flow first; other retained function graphs remain accessible in the expandable list beside breadcrumbs. Double-click FUNC or DATA function-value nodes to navigate to unambiguous local, cross-level or recursive targets, and use Back to return to the caller.
 - **循环子图**: LOOP nodes provide separate condition/body buttons; double-click enters the body. Referenced loop subgraphs no longer appear as detached cards in hierarchy mode. The inspector lists initial state, iterated elements and captures; a compact subgraph bar explains the returned state and provides a return-to-LOOP action. LOOP breakpoints remain available in its inspector. Missing or ambiguous subgraphs keep their fallback cards and disable uncertain entry buttons.
 - **图排列** in display options switches between vertical module-level graphs (default, preserving the original layout inside functions) and the original Graphviz layout. Vertical mode fits the width; use Fit to see the full graph.
-- **图 / 文本** switches between the interactive graph and the same raw GIR DOT output
+- **图 / 文本** switches between the interactive graph and the same raw GIR output (JSON or DOT)
 - **复制 GIR** copies the displayed GIR; **在编辑器打开** opens an editable document that can be saved
 - current unsaved editor text is used; **刷新** recompiles it, and saving refreshes automatically
 - compilation failures are displayed in the panel instead of leaving a blank or stale graph
 
 - pan / zoom / node selection with attribute inspection
-- pass picker: `std::rgir` (compact), `std::agir` (role-annotated), `std::gir` (styled)
+- pass picker: `std::jgir` (default, versioned JSON), `std::gir` (compact DOT), `std::rgir` (rich Graphviz DOT), `std::agir` (compact DOT with roles). The plugin requires `std::jgir` support for the default view; it does not silently substitute an older format.
 - **per-pass compile snapshots**: while a debug session is active, a stage dropdown lists the GIR captured before and after each compiler pass (served by `camel-db`); node breakpoints, pause highlight and jump-to-source work in snapshot views too
 - auto-refresh on save
 - **double-click a node to set a node breakpoint** (used by the debugger)

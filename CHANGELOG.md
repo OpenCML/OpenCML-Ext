@@ -1,3 +1,10 @@
+## 1.10.0
+
+- Use the versioned `std::jgir` JSON interchange by default. Graph references, output types, input kinds, port indices, source ranges and origins are structured fields; display labels no longer determine JSON navigation.
+- Align export choices with the new runtime semantics: `gir` is compact DOT, `rgir` is rich DOT, `agir` is compact DOT with roles. Require `jgir` support rather than silently substituting an older format.
+- Show node output types in full-node hover and details without adding permanent graph labels. Preserve raw JSON for text, copy and editor export, and generate DOT only for layout.
+- Validate JSON versions, graph/node identities, references, ports, edges and source ranges. Keep synthetic ARGS/EXIT markers in the viewer.
+
 ## 1.9.1
 
 - Reduce LOOP nodes to a compact title and unboxed condition/body navigation row. Remove inline state explanations and selection glow; keep state/capture details in the inspector.

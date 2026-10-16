@@ -37,7 +37,7 @@ assert.equal(focusGraph(moduleModel, 'm').nodes.find(n => n.id === 'm/caller').d
 assert.equal(focusGraph(moduleModel, 'r').nodes.find(n => n.id === 'r/self').data.enterScope, 'r')
 if (process.env.GIR_CASE_FILE) {
  const { execFileSync } = await import('node:child_process')
- const dot = execFileSync(process.env.CAMEL_EXE_PATH || 'D:/Projects/Camel/out/latest/bin/camel.exe', ['--color', 'never', process.env.GIR_CASE_FILE, 'std::rgir'], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 })
+ const dot = execFileSync(process.env.CAMEL_EXE_PATH || 'D:/Projects/Camel/out/latest/bin/camel.exe', ['--color', 'never', process.env.GIR_CASE_FILE, 'std::gir'], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 })
  const real = buildFlowModel(parseDot(dot.slice(dot.indexOf('digraph'))), {})
  const entries = moduleEntries(real)
  assert.equal(entries.size, 1)

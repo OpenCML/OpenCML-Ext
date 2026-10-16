@@ -8,6 +8,19 @@ export function mapGirSources(dot: string | null, source: string, scratch?: stri
         const normalized = path.resolve(file).replace(/\\/g, '/')
         return process.platform === 'win32' ? normalized.toLowerCase() : normalized
     }
+    if (dot.trimStart().startsWith('{')) {
+        const data = JSON.parse(dot)
+        if (data.format !== 'camel.gir' || data.version !== 1 || !Array.isArray(data.graphs)) return dot
+        for (const graph of data.graphs) {
+            for (const node of graph.nodes || []) {
+                if (typeof node.source?.file !== 'string') continue
+                const file = path.resolve(path.dirname(source), node.source.file)
+                const nativeSource = path.basename(file).replace(/^\.camel-ls-\d+-/, '')
+                if (scratch && key(file) === key(scratch) || nativeSource !== path.basename(file) && key(path.join(path.dirname(file), nativeSource)) === key(source)) node.source.file = source.replace(/\\/g, '/')
+            }
+        }
+        return JSON.stringify(data, null, 2)
+    }
     return dot.replace(/\bsrcfile\s*=\s*"((?:\\.|[^"\\])*)"/g, (attribute, encoded: string) => {
         const file = encoded.replace(/\\([\\"])/g, '$1')
         const resolved = path.resolve(path.dirname(source), file)

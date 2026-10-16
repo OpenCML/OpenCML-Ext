@@ -16,4 +16,9 @@ for (const file of [path.resolve('other/.camel-ls-123-main.cml'), path.join(path
     assert.equal(mapGirSources(attr(file), source, scratch), attr(file), 'unrelated source must stay unchanged')
 }
 assert.equal(mapGirSources(`label=${JSON.stringify(native)}`, source), `label=${JSON.stringify(native)}`)
+const jsonGraph = { format: 'camel.gir', version: 1, graphs: [{ nodes: [{ label: scratch, source: { file: scratch } }, { source: { file: path.join(path.dirname(source), 'lib.cml') } }] }] }
+const mapped = JSON.parse(mapGirSources(JSON.stringify(jsonGraph), source, scratch))
+assert.equal(mapped.graphs[0].nodes[0].source.file, source.replaceAll('\\', '/'))
+assert.equal(mapped.graphs[0].nodes[0].label, scratch, 'never rewrite a string constant that resembles a scratch path')
+assert.equal(mapped.graphs[0].nodes[1].source.file, jsonGraph.graphs[0].nodes[1].source.file)
 console.log('GIR source mapping passed')

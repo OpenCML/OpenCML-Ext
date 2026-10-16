@@ -131,7 +131,7 @@ async function runCamel(): Promise<number | undefined> {
     }
 }
 
-// Extract a Graphviz DOT graph from camel stdout (the std::rgir family of passes).
+// Extract a Graphviz DOT graph from camel stdout (the DOT GIR passes).
 function extractDot(stdout: string): string | null {
     const match = /^\s*(?:strict\s+)?(?:di)?graph\b/m.exec(stdout)
     if (!match) {
@@ -147,7 +147,8 @@ async function computeGirDot(
     const uri = vscode.Uri.file(filePath)
     const doc = await vscode.workspace.openTextDocument(uri)
     await languageServerQueue
-    if (pass === 'std::rgir' && client?.initializeResult?.capabilities.experimental?.camelGraphProvider) {
+    if (pass === 'std::jgir' && runtimeStatus.snapshot.compatibility?.features.structuredGir?.supported === false) throw new Error(t('Structured GIR requires a runtime with std::jgir support.'))
+    if (pass === 'std::gir' && client?.initializeResult?.capabilities.experimental?.camelGraphProvider) {
         const result = await client.sendRequest<{ text: string; diagnostics?: string }>('camel/graph', {
             textDocument: { uri: uri.toString() }
         })
@@ -164,6 +165,11 @@ async function computeGirDot(
         const { stdout, stderr } = await execFileAsync(toolchain.camel, ['--color', 'never', scratch, pass], {
             cwd: path.dirname(filePath), windowsHide: true
         })
+        if (pass === 'std::jgir') {
+            const data = JSON.parse(stdout)
+            if (data.format !== 'camel.gir' || data.version !== 1 || !Array.isArray(data.graphs)) throw new Error('Unsupported GIR JSON format')
+            return { dot: mapGirSources(stdout, filePath, scratch), output: stderr || '' }
+        }
         const output = stdout.split(scratch).join(filePath)
         return { dot: mapGirSources(extractDot(output), filePath, scratch), output: stderr ? `${output}\n${stderr}` : output }
     } catch (error) {
@@ -194,7 +200,7 @@ function registerGirPanel(context: vscode.ExtensionContext): GirPanelState {
     const state: GirPanelState = {
         panel: undefined as unknown as vscode.WebviewPanel,
         fileUri: null,
-        pass: 'std::rgir',
+        pass: 'std::jgir',
         autoRefresh: context.workspaceState.get<boolean>('gir.autoRefresh', vscode.workspace.getConfiguration('opencmlLanguageServer').get('gir.refreshOn', 'onSave') === 'onSave'),
         followSource: context.workspaceState.get<boolean>('gir.followSource', vscode.workspace.getConfiguration('opencmlLanguageServer').get('gir.followActiveEditor', true)),
         breakpoints: new Map<string, number | null>(),
@@ -241,7 +247,7 @@ function registerGirPanel(context: vscode.ExtensionContext): GirPanelState {
                     return
                 case 'openGirText':
                     if (typeof message.text === 'string') {
-                        void vscode.workspace.openTextDocument({ content: message.text, language: 'plaintext' })
+                        void vscode.workspace.openTextDocument({ content: message.text, language: message.text.trimStart().startsWith('{') ? 'json' : 'plaintext' })
                             .then(doc => vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside))
                     }
                     return
@@ -251,7 +257,7 @@ function registerGirPanel(context: vscode.ExtensionContext): GirPanelState {
                     }
                     return
                 case 'passChanged':
-                    state.pass = ['std::rgir', 'std::agir', 'std::gir'].includes(message.pass) ? message.pass : 'std::rgir'
+                    state.pass = ['std::jgir', 'std::rgir', 'std::agir', 'std::gir'].includes(message.pass) ? message.pass : 'std::jgir'
                     if (state.fileUri) {
                         renderForFile(state, state.fileUri, true)
                     }

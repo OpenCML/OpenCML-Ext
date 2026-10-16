@@ -26,6 +26,11 @@ assert(old.warnings.length)
 assert.equal(old.features.cliGir.supported, true, 'backported feature must remain usable')
 assert.equal(old.features.fillTypes.supported, true)
 assert.equal(old.features.cliDiagnostics.supported, true)
+assert.equal(old.features.structuredGir.supported, false)
+const jsonRuntime = await inspectCompatibility('mock', async (exe, args, cwd) => args.at(-1) === 'std::jgir'
+    ? { stdout: JSON.stringify({ format: 'camel.gir', version: 1, root: 'g0', graphs: [{ id: 'g0' }] }), stderr: '' }
+    : runner(exe, args, cwd))
+assert.equal(jsonRuntime.features.structuredGir.supported, true)
 assert(!fs.existsSync(path.dirname(fixture)), 'probe files leaked')
 const unknown = await inspectCompatibility('mock', async () => ({ stdout: 'not a version or graph', stderr: '' }))
 assert.equal(unknown.status, 'unknown')

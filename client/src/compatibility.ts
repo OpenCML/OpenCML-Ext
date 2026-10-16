@@ -54,10 +54,17 @@ export async function inspectCompatibility(executable: string, runner: Runner = 
         await fs.writeFile(source, 'func make(value: int): int[] { return [value, value] }\nfunc main(): int[] { return make(1) }\n')
         const bad = path.join(dir, 'diagnostics.cml')
         await fs.writeFile(bad, 'func main(): int { return missing_capability_probe }\n')
-        const [gir, diagnostics] = await Promise.all([
-            runner(executable, ['--color', 'never', source, 'std::rgir'], dir),
-            runner(executable, ['check', '-O', 'json', bad], dir)
+        const [gir, diagnostics, structured] = await Promise.all([
+            runner(executable, ['--color', 'never', source, 'std::gir'], dir),
+            runner(executable, ['check', '-O', 'json', bad], dir),
+            runner(executable, ['--color', 'never', source, 'std::jgir'], dir)
         ])
+        let structuredGir = false
+        try {
+            const data = JSON.parse(structured.stdout)
+            structuredGir = !structured.error && data.format === 'camel.gir' && data.version === 1 && Array.isArray(data.graphs) && data.graphs.some((g: { id?: string }) => g?.id === data.root)
+        } catch { /* Only the versioned JSON interchange is accepted. */ }
+        report.features.structuredGir = { supported: structuredGir, reason: structuredGir ? t('Read-only compilation probe passed.') : structured.stderr || structured.error || t('Structured GIR requires a runtime with std::jgir support.') }
         const graph = !gir.error && /\bdigraph\s+\w*\s*\{/.test(gir.stdout)
         report.features.cliGir = { supported: graph, reason: graph ? t('Read-only compilation probe passed.') : gir.stderr || gir.error || t('No GIR generated') }
         for (const [name, attribute] of [['portNames', 'param_name'], ['fillTypes', 'value_type'], ['sourceLocations', 'span']]) {

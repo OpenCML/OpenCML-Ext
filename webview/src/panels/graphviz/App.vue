@@ -5,6 +5,7 @@ import { onMounted, onUnmounted, ref, computed, nextTick, watch, provide } from 
 import { VueFlow, useVueFlow, MarkerType, type Node, type Edge, type NodeTypesObject } from '@vue-flow/core'
 import { Graphviz } from '@hpcc-js/wasm/graphviz'
 import { parseDot, isDotGraph } from './dot'
+import { parseGirJson } from './jgir'
 import { buildFlowModel, type FlowNode, type FlowEdge } from './layout'
 import { neighbors } from './explore'
 import { focusGraph, parentScope, moduleEntries } from './hierarchy'
@@ -95,7 +96,7 @@ function hoverNode(event: { node: Node }) {
 }
 const status = ref(t("Waiting for GraphIR…"))
 const fileName = ref('')
-const pass = ref('std::rgir')
+const pass = ref('std::jgir')
 const autoRefresh = ref(true)
 const followSource = ref(true)
 function toggleFollowSource() { vscode.postMessage({ command: 'followSource', enabled: !followSource.value }) }
@@ -384,14 +385,14 @@ async function renderDotMessage(message: RenderMessage) {
     girText.value = message.dot || ''
     errorText.value = message.error || ''
     fileName.value = message.fileName || ''
-    if (message.pass && ['std::rgir', 'std::agir', 'std::gir'].includes(message.pass)) pass.value = message.pass
+    if (message.pass && ['std::jgir', 'std::rgir', 'std::agir', 'std::gir'].includes(message.pass)) pass.value = message.pass
     selectedNode.value = null
     nodes.value = []
     edges.value = []
     loading.value = false
     svgMarkup.value = ''
     useSvgFallback.value = false
-    if (!message.dot || !isDotGraph(message.dot)) {
+    if (!message.dot || !isDotGraph(message.dot) && !message.dot.trimStart().startsWith('{')) {
         status.value = t("No GIR generated")
         errorText.value ||= t("No GIR was generated. Check compilation errors, then refresh.")
         nodes.value = []
@@ -405,9 +406,12 @@ async function renderDotMessage(message: RenderMessage) {
         return
     }
     status.value = t("Computing layout…")
+    let layoutDot = message.dot
     try {
-        const dot = parseDot(message.dot)
-        const layoutJson = await graphviz.layout(loopLayoutDot(message.dot, dot), 'json', 'dot')
+        const structured = message.dot.trimStart().startsWith('{') ? parseGirJson(message.dot) : undefined
+        const dot = structured?.graph ?? parseDot(message.dot)
+        layoutDot = structured?.dot ?? message.dot
+        const layoutJson = await graphviz.layout(loopLayoutDot(layoutDot, dot), 'json', 'dot')
         const gv = JSON.parse(layoutJson)
         const model = buildFlowModel(dot, gv, arrangement.value)
         if (model.nodes.length === 0) {
@@ -423,7 +427,8 @@ async function renderDotMessage(message: RenderMessage) {
     } catch (error) {
         // Fallback: static SVG rendering when the interactive pipeline fails.
         try {
-            const svg = await graphviz.layout(message.dot, 'svg', 'dot')
+            if (!isDotGraph(layoutDot)) throw error
+            const svg = await graphviz.layout(layoutDot, 'svg', 'dot')
             svgMarkup.value = svg
             useSvgFallback.value = true
             nodes.value = []
@@ -677,9 +682,10 @@ onUnmounted(() => {
         <section v-if="showOptions" id="gir-options" class="options" :aria-label='t("Display options")'>
             <label class="option-field"><span> {{ t("Output format") }} </span>
                 <select v-model="pass" @change="changePass" title="GIR pass" :disabled="snapshotSel !== null">
-                    <option value="std::rgir"> {{ t("rgir · Compact") }} </option>
+                    <option value="std::jgir"> {{ t("jgir · JSON") }} </option>
+                    <option value="std::gir"> {{ t("gir · Compact") }} </option>
+                    <option value="std::rgir"> {{ t("rgir · Rich") }} </option>
                     <option value="std::agir"> {{ t("agir · Roles") }} </option>
-                    <option value="std::gir"> {{ t("gir · Full styling") }} </option>
                 </select>
             </label>
             <label class="option-field"><span> {{ t("Compilation stage") }} </span>
