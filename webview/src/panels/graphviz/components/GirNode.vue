@@ -23,6 +23,7 @@ const props = defineProps<{
     data: GirNodeData
     selected: boolean
 }>()
+const functionValue = computed(() => props.data.attrs.function_value === '1')
 const boundary = computed(() => ['ARGS', 'EXIT'].includes(props.data.nodeType))
 const openSubgraph = inject<(scope: string) => void>('gir-open-subgraph')
 const nodeTitle = computed(() => {
@@ -32,6 +33,7 @@ const nodeTitle = computed(() => {
         : t("Subgraph output boundary: marks the actual exit node's output; not a runtime node.")
     const kind = ({ normal: t("Normal parameter"), with: t("Context parameter"), capture: t("Captured variable") } as Record<string, string>)[data.attrs.param_kind]
     const details = [data.label]
+    if (functionValue.value) details.push(data.attrs.label)
     details.push(`${t('Output type')}: ${data.attrs.value_type || t('Not provided')}`)
     if (kind) details.push(kind)
     if (data.attrs.param_index !== undefined) details.push(t("Port index (zero-based): {0}", data.attrs.param_index))
@@ -46,7 +48,7 @@ const nodeTitle = computed(() => {
         :title="nodeTitle"
         :class="[
             `t-${data.nodeType.toLowerCase()}`,
-            { selected, boundary, breakpoint: !boundary && data.breakpoint, paused: !boundary && data.paused }
+            { selected, boundary, 'function-value': functionValue, breakpoint: !boundary && data.breakpoint, paused: !boundary && data.paused }
         ]"
         :style="{ width: `${data.width}px`, height: `${data.height}px` }"
     >
@@ -58,8 +60,8 @@ const nodeTitle = computed(() => {
             </div>
         </template>
         <template v-else>
-            <div class="gir-label" :title="nodeTitle">{{ boundary ? (data.nodeType === 'ARGS' ? t("Input") : t("Output")) : data.label }}</div>
-            <div v-if="!boundary" class="gir-type">{{ data.nodeType }}<span v-if="data.enterScope" :aria-label='t("Open subgraph")'>↗</span></div>
+            <div class="gir-label" :title="nodeTitle"><span v-if="functionValue" class="function-symbol" aria-hidden="true">ƒ</span>{{ boundary ? (data.nodeType === 'ARGS' ? t("Input") : t("Output")) : data.label }}</div>
+            <div v-if="!boundary" class="gir-type">{{ functionValue ? t("Function value") : data.nodeType }}<span v-if="data.enterScope" :aria-label='t("Open subgraph")'>↗</span></div>
         </template>
         <Handle v-if="data.nodeType !== 'ARGS'" id="t" type="target" :position="Position.Top" />
         <Handle v-if="data.nodeType !== 'EXIT'" id="s" type="source" :position="Position.Bottom" />
@@ -80,6 +82,9 @@ const nodeTitle = computed(() => {
 .gir-type { color: var(--gir-muted, #9d9d9d); font-size: 8px; flex-shrink: 0; letter-spacing: .07em; line-height: 1.2; display: flex; align-items: center; justify-content: center; gap: 5px; }
 .gir-type::before { content: ''; width: 4px; height: 4px; border-radius: 50%; background: var(--node-accent); }
 .t-exit { --node-accent: var(--vscode-symbolIcon-eventForeground, #ee9d28); }
+.function-symbol { color: var(--node-accent); margin-right: 6px; }
+.function-value { --node-accent: var(--vscode-symbolIcon-functionForeground, #b180d7); }
+.function-value .gir-type { letter-spacing: 0; }
 .t-call { --node-accent: var(--vscode-symbolIcon-functionForeground, #b180d7); }
 .t-loop { --node-accent: var(--vscode-symbolIcon-functionForeground, #b180d7); padding: 7px 8px 5px; gap: 0; box-shadow: none; }
 .loop-heading { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; }

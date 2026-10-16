@@ -14,6 +14,14 @@ const document = { format: 'camel.gir', version: 1, root: 'g0', graphs: [
 const result = parseGirJson(JSON.stringify(document))
 const model = buildFlowModel(result.graph, {})
 assert.equal(graphTarget(model, model.nodes.find(n => n.id === 'n0')), 'cluster_g1', 'explicit IDs must win over duplicate display names')
+const functionValue = model.nodes.find(n => n.id === 'n0').data
+assert.equal(functionValue.label, 'same name')
+assert.equal(functionValue.nodeType, 'DATA')
+assert.equal(functionValue.attrs.label, 'not a graph reference')
+assert.equal(functionValue.attrs.function_value, '1')
+assert.equal(functionValue.height, 44)
+assert(result.dot.includes('fixedsize="true"'))
+assert.equal(model.nodes.find(n => n.id === 'n1').data.attrs.function_value, undefined)
 const loop = model.nodes.find(n => n.id === 'cluster_g1/n2').data.loop
 assert.equal(loop.kind, 'for')
 assert.equal(loop.body.scope, 'cluster_g2')

@@ -133,6 +133,7 @@ export function buildFlowModel(dot: DotGraph, gv: GvJson, arrangement: 'original
                 s.width = 64
                 s.height = 24
             }
+            if (node.attrs.function_value === '1') { s.width = Math.max(104, s.width); s.height = 44 }
             if (node.attrs.type === 'LOOP') { s.width = 148; s.height = 56 }
             nodeIds.add(key)
             nodes.push({
@@ -140,7 +141,7 @@ export function buildFlowModel(dot: DotGraph, gv: GvJson, arrangement: 'original
                 position: topLeft({ x: c.x, y: flip(c.y) }, s),
                 type: 'gir',
                 data: {
-                    label: (node.attrs.type === 'PORT' || node.attrs.type === 'CLOSURE_PORT')
+                    label: node.attrs.function_value === '1' ? node.attrs.function_name : (node.attrs.type === 'PORT' || node.attrs.type === 'CLOSURE_PORT')
                         ? node.attrs.param_name || node.attrs.label || node.id
                         : node.attrs.type === 'FILL' ? node.attrs.value_type || node.attrs.label || node.id
                         : node.attrs.label ?? node.id,

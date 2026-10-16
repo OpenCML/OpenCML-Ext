@@ -781,6 +781,7 @@ onUnmounted(() => {
             <aside v-if="selectedNode" class="info" :aria-label='t("Node details")'>
                 <div class="info-heading"><span> {{ t("Node details") }} </span><button class="icon-button" :aria-label='t("Close node details")' @click="selectedNode = null"><PanelIcon name="close" :size="14" /></button></div>
                 <div class="node-name">{{ selectedNode.loop ? loopLabel(selectedNode.loop) : selectedNode.label }}</div>
+                <div v-if="selectedNode.attrs.function_value" class="function-detail">{{ t("Function value") }} · {{ selectedNode.attrs.label }}</div>
                 <dl><dt>ID</dt><dd>{{ selectedNode.id }}</dd><dt> {{ t("Kind") }} </dt><dd>{{ selectedNode.nodeType }}</dd><template v-if="!['ARGS', 'EXIT', 'cluster'].includes(selectedNode.nodeType)"><dt>{{ t('Output type') }}</dt><dd class="output-type">{{ selectedNode.attrs.value_type || t('Not provided') }}</dd></template><template v-if="selectedNode.attrs.param_kind"><dt> {{ t("Parameter") }} </dt><dd>{{ ({ normal: t("Normal parameter"), with: t("Context parameter"), capture: t("Captured variable") } as Record<string, string>)[selectedNode.attrs.param_kind] || selectedNode.attrs.param_kind }}</dd></template><template v-if="selectedNode.attrs.param_index !== undefined"><dt> {{ t("Index") }} </dt><dd>{{ selectedNode.attrs.param_index }} {{ t("(zero-based)") }} </dd></template><template v-if="selectedNode.role"><dt> {{ t("Role") }} </dt><dd>{{ selectedNode.role }}</dd></template><template v-if="selectedNode.attrs?.span"><dt> {{ t("Location") }} </dt><dd>{{ selectedNode.attrs.srcfile }}:{{ selectedNode.attrs.span }}</dd></template></dl>
                 <section v-if="selectedNode.loop" class="loop-detail" :aria-label="t('Loop structure')">
                     <div class="loop-graph-links">
@@ -946,6 +947,7 @@ h1 { margin: 0; font-size: 13px; font-weight: 650; letter-spacing: .04em; }
 .loop-detail small { display: block; color: var(--gir-muted); }
 .info-heading { display: flex; justify-content: space-between; align-items: center; color: var(--gir-muted); font-size: 10px; }
 .info-heading .icon-button { width: 22px; height: 22px; margin-right: -5px; }
+.function-detail { font: 10px/1.5 var(--gir-mono); overflow-wrap: anywhere; margin-bottom: 12px; color: var(--gir-muted); }
 .node-name { font: 12px/1.5 var(--gir-mono); overflow-wrap: anywhere; margin: 10px 0 14px; }
 .info dl { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 12px; font-size: 10px; line-height: 1.5; }
 .info dt { color: var(--gir-muted); }

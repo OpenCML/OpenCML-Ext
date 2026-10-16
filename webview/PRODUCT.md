@@ -21,3 +21,7 @@ stepping cannot silently mean a compiler step. Preserve theme tokens and wrap at
 
 Hierarchy opens a uniquely referenced module-entry main directly, with a route back to the
 module. Preserve explicit navigation choices; a library graph merely named main is not an entry.
+
+Function-valued DATA nodes use explicit JSON callee references for a compact function name and
+function glyph. Retain DATA semantics and the original runtime representation in inspection;
+never infer function identity from a display string. Layout uses the compact card dimensions.

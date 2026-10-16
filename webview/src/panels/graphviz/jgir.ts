@@ -75,6 +75,10 @@ export function parseGirJson(raw: string): { graph: DotGraph; dot: string; docum
         if (n.callee != null) {
             requireField(scopes.has(n.callee), 'callee graph')
             attrs.callee_scope = scopes.get(n.callee)!
+            if (n.kind === 'DATA') {
+                attrs.function_value = '1'
+                attrs.function_name = graphs.get(n.callee)!.name
+            }
         }
         if (n.loop) {
             requireField(['while', 'for', 'for-while'].includes(n.loop.kind) && scopes.has(n.loop.body), 'loop body')
@@ -117,7 +121,7 @@ export function parseGirJson(raw: string): { graph: DotGraph; dot: string; docum
     const emit = (g: DotSubgraph, root = false): string => `${root ? 'digraph GraphIR' : `subgraph ${quoted(g.id!)}`} {\n`
         + (root ? '' : `label=${quoted(g.attrs.label || '')};\n`)
         + g.subgraphs.map(child => emit(child)).join('')
-        + g.nodes.map(n => `${quoted(n.id)} [${attributes(n.attrs)}];\n`).join('')
+        + g.nodes.map(n => `${quoted(n.id)} [${attributes(n.attrs.function_value === '1' ? { ...n.attrs, label: n.attrs.function_name, fixedsize: 'true', width: String(Math.max(104, Math.min(220, n.attrs.function_name.length * 7 + 32)) / 72), height: String(44 / 72) } : n.attrs)}];\n`).join('')
         + g.edges.map(e => `${quoted(e.from)} -> ${quoted(e.to)} [${attributes(e.attrs)}];\n`).join('') + '}\n'
     return { graph, dot: emit(graph, true), document: data }
 }

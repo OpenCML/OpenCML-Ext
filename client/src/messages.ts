@@ -243,4 +243,5 @@ export const zh: Record<string, string> = {
     "Continue": "继续",
     "Source GIR": "源码 GIR",
     "Running": "运行中",
+    "Function value": "函数值",
 }

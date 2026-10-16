@@ -53,13 +53,18 @@ exports.run = async (vscode, workspace) => {
         await frame.locator('.gir-node').first().waitFor({ state: 'visible', timeout: 20000 })
         const chromeHeight = await frame.locator('.canvas').evaluate(node => node.getBoundingClientRect().top)
         assert(chromeHeight <= 78, `flat toolbar exceeds two compact rows: ${chromeHeight}`)
+        const functionCard = frame.locator('.gir-node.function-value')
+        await functionCard.waitFor()
+        assert.equal(await functionCard.locator('.gir-type').innerText(), label('Function value'))
+        assert((await functionCard.getAttribute('title')).includes('Function(graph=main,'))
+        assert.equal(await functionCard.locator('.gir-label').innerText(), 'ƒmain')
         const centers = await frame.locator('.gir-node').evaluateAll(nodes => {
             const center = label => {
                 const node = nodes.find(node => label(node.querySelector('.gir-label')?.textContent || ''))
                 const rect = node?.getBoundingClientRect()
                 return rect ? rect.x + rect.width / 2 : null
             }
-            return [center(label => label.startsWith('Function(')), center(label => label === 'CALL')]
+            return [center(label => label === 'ƒmain'), center(label => label === 'CALL')]
         })
         assert(centers.every(center => center !== null) && Math.abs(centers[0] - centers[1]) < 2,
             `capped Function node and CALL must remain centered: ${centers}`)
