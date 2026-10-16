@@ -2,7 +2,8 @@
 import { t } from '../../../../../client/src/localization'
 
 import { computed, inject } from 'vue'
-import { loopLabel, stateLabel, type LoopDetails } from '../loops'
+import { loopLabel, type LoopDetails } from '../loops'
+import PanelIcon from './PanelIcon.vue'
 import { Handle, Position } from '@vue-flow/core'
 
 export interface GirNodeData {
@@ -49,11 +50,10 @@ const nodeTitle = computed(() => {
         :style="{ width: `${data.width}px`, height: `${data.height}px` }"
     >
         <template v-if="data.loop">
-            <div class="gir-label" :title="nodeTitle">{{ loopLabel(data.loop) }}</div>
-            <div class="loop-state" :title="stateLabel(data.loop)">{{ stateLabel(data.loop) }} <span aria-hidden="true">→</span> {{ t('Next state') }}</div>
-            <div class="loop-actions nodrag nopan" @dblclick.stop>
-                <button v-if="data.loop.condition" type="button" :disabled="!data.loop.condition.scope" :title="data.loop.condition.scope ? data.loop.condition.name : t('Subgraph unavailable or ambiguous')" :aria-label="t('Enter loop condition')" @click.stop="data.loop.condition.scope && openSubgraph?.(data.loop.condition.scope)">{{ t('Condition') }} ↗</button>
-                <button type="button" :disabled="!data.loop.body?.scope" :title="data.loop.body?.scope ? data.loop.body.name : t('Subgraph unavailable or ambiguous')" :aria-label="t('Enter loop body')" @click.stop="data.loop.body?.scope && openSubgraph?.(data.loop.body.scope)">{{ t('Loop body') }} ↗</button>
+            <div class="loop-heading"><PanelIcon name="loop" :size="12" /><div class="gir-label" :title="nodeTitle">{{ loopLabel(data.loop) }}</div></div>
+            <div class="loop-actions nodrag nopan">
+                <button v-if="data.loop.condition" type="button" :disabled="!data.loop.condition.scope" :title="data.loop.condition.scope ? data.loop.condition.name : t('Subgraph unavailable or ambiguous')" :aria-label="t('Enter loop condition')" @dblclick.stop @click.stop="data.loop.condition.scope && openSubgraph?.(data.loop.condition.scope)">{{ t('Condition') }}<PanelIcon name="chevron" :size="10" /></button>
+                <button type="button" :disabled="!data.loop.body?.scope" :title="data.loop.body?.scope ? data.loop.body.name : t('Subgraph unavailable or ambiguous')" :aria-label="t('Enter loop body')" @dblclick.stop @click.stop="data.loop.body?.scope && openSubgraph?.(data.loop.body.scope)">{{ t('Loop body') }}<PanelIcon name="chevron" :size="10" /></button>
             </div>
         </template>
         <template v-else>
@@ -80,15 +80,19 @@ const nodeTitle = computed(() => {
 .gir-type::before { content: ''; width: 4px; height: 4px; border-radius: 50%; background: var(--node-accent); }
 .t-exit { --node-accent: var(--vscode-symbolIcon-eventForeground, #ee9d28); }
 .t-call { --node-accent: var(--vscode-symbolIcon-functionForeground, #b180d7); }
-.t-loop { --node-accent: var(--vscode-symbolIcon-functionForeground, #b180d7); gap: 5px; }
-.loop-state { font: 10px/1.3 var(--gir-mono, monospace); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.loop-state span { color: var(--gir-muted); margin: 0 3px; }
-.loop-actions { display: flex; align-items: center; justify-content: center; gap: 6px; }
-.loop-actions button { border: 1px solid var(--gir-line); border-radius: 4px; padding: 3px 7px; background: transparent; color: var(--gir-fg); font: 10px/1.3 var(--vscode-font-family, sans-serif); cursor: pointer; }
-.loop-actions button:hover:not(:disabled) { background: var(--vscode-toolbar-hoverBackground, #8882); border-color: var(--node-accent); }
+.t-loop { --node-accent: var(--vscode-symbolIcon-functionForeground, #b180d7); padding: 7px 8px 5px; gap: 0; box-shadow: none; }
+.loop-heading { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; }
+.loop-heading > svg { flex-shrink: 0; color: var(--node-accent); }
+.loop-actions { display: flex; align-items: center; margin-top: 6px; padding-top: 3px; border-top: 1px solid var(--gir-line); }
+.loop-actions button { display: flex; align-items: center; justify-content: center; gap: 4px; flex: 1; min-width: 0; border: 0; border-radius: 2px; padding: 2px 3px; background: transparent; color: var(--gir-fg); font: 10px/1.3 var(--vscode-font-family, sans-serif); white-space: nowrap; cursor: pointer; }
+.loop-actions button + button { border-left: 1px solid var(--gir-line); border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.loop-actions button > svg { flex-shrink: 0; }
+.loop-actions button:hover:not(:disabled) { background: var(--vscode-toolbar-hoverBackground, #8882); color: var(--gir-accent); }
+.loop-actions button:active:not(:disabled) { background: var(--vscode-toolbar-activeBackground, #8883); }
 .loop-actions button:focus-visible { outline: 1px solid var(--vscode-focusBorder, #007fd4); outline-offset: 2px; }
 .loop-actions button:disabled { color: var(--vscode-disabledForeground, #858585); cursor: default; }
 .gir-node.selected { border-color: var(--gir-accent, #007fd4); box-shadow: 0 0 0 2px color-mix(in srgb, var(--gir-accent, #007fd4) 20%, transparent); }
+.gir-node.t-loop.selected { box-shadow: none; }
 .gir-node.breakpoint { outline: 2px solid var(--vscode-debugIcon-breakpointForeground, #e51400); outline-offset: 2px; }
 .gir-node.paused { background: color-mix(in srgb, var(--vscode-editorWarning-foreground, #cca700) 12%, var(--gir-bg, #1e1e1e)); border-color: var(--vscode-editorWarning-foreground, #cca700); }
 .gir-node.boundary { border: 0; border-radius: 0; background: transparent; box-shadow: none; padding: 0; color: var(--gir-fg); }

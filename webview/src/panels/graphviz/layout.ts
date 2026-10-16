@@ -133,7 +133,7 @@ export function buildFlowModel(dot: DotGraph, gv: GvJson, arrangement: 'original
                 s.width = 64
                 s.height = 24
             }
-            if (node.attrs.type === 'LOOP') { s.width = 180; s.height = 80 }
+            if (node.attrs.type === 'LOOP') { s.width = 148; s.height = 56 }
             nodeIds.add(key)
             nodes.push({
                 id: key,

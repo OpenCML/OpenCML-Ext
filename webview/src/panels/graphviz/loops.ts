@@ -54,7 +54,7 @@ export function loopDetails(model: FlowModel, node: FlowNode): LoopDetails | und
 export function loopLayoutDot(raw: string, dot: DotGraph): string {
     const overrides: string[] = []
     const walk = (sub: DotSubgraph) => {
-        for (const node of sub.nodes) if (node.attrs.type === 'LOOP') overrides.push(`${JSON.stringify(node.id)} [label="", fixedsize=true, width=2.5, height=1.12];`)
+        for (const node of sub.nodes) if (node.attrs.type === 'LOOP') overrides.push(`${JSON.stringify(node.id)} [label="", fixedsize=true, width=${148 / 72}, height=${56 / 72}];`)
         sub.subgraphs.forEach(walk)
     }
     walk(dot)

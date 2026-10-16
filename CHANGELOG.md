@@ -1,3 +1,8 @@
+## 1.9.1
+
+- Reduce LOOP nodes to a compact title and unboxed condition/body navigation row. Remove inline state explanations and selection glow; keep state/capture details in the inspector.
+- Preserve double-click entry through the compact node's central divider while keeping navigation buttons independent.
+
 ## 1.9.0
 
 - Make LOOP nodes navigable: separate condition/body buttons, double-click body entry, nested-loop breadcrumbs, sibling switching and return to the owning LOOP.

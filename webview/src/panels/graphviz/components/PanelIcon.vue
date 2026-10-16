@@ -1,6 +1,8 @@
 <script setup lang="ts">
 defineProps<{ name: string; size?: number }>()
 const paths: Record<string, string> = {
+    loop: 'M18 4l3 3-3 3 M21 7H7a4 4 0 0 0-4 4 M6 20l-3-3 3-3 M3 17h14a4 4 0 0 0 4-4',
+    chevron: 'M9 5l7 7-7 7',
     follow: 'M4 7h14l-3-3 M20 17H6l3 3 M18 7l-3 3 M6 17l3-3',
     pin: 'M9 3h6l-1 7 4 4H6l4-4z M12 14v7',
     graph: 'M5 4h4v4H5z M15 16h4v4h-4z M5 16h4v4H5z M7 8v4h10v4 M7 12v4',

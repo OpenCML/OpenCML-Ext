@@ -210,7 +210,6 @@ export const zh: Record<string, string> = {
     "Replace with '{0}'": "替换为“{0}”",
     "Condition": "条件",
     "Loop body": "循环体",
-    "Next state": "下一轮",
     "Loop state": "循环状态",
     "Enter loop condition": "进入循环条件",
     "Enter loop body": "进入循环体",
