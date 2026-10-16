@@ -2,7 +2,7 @@
     "name": "open-cml-extension",
     "displayName": "OpenCML-Ext",
     "description": "%description%",
-    "version": "1.12.1",
+    "version": "1.12.2",
     "publisher": "Kogler7",
     "icon": "assets/icon.jpg",
     "type": "module",
@@ -322,7 +322,7 @@
                                 },
                                 "default": [
                                     "std::macro",
-                                    "std::inline",
+                                    "std::opt",
                                     "std::nvm"
                                 ],
                                 "description": "%contributes.debuggers.0.configurationAttributes.launch.properties.passes.description%"

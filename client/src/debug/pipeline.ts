@@ -15,9 +15,9 @@ export async function launchPipeline(context: vscode.ExtensionContext, inspect: 
     const saved = context.workspaceState.get<SavedPipeline>(key)
     const input = await vscode.window.showInputBox({
         title: inspect ? t('Debug GIR Passes') : t('Run with Passes'),
-        value: saved?.input ?? 'std::macro std::inline std::nvm',
+        value: saved?.input ?? 'std::macro std::opt std::nvm',
         prompt: t('Enter passes in execution order, or paste camel "file.cml" pass1 pass2. No shell commands or CLI flags.'),
-        placeHolder: 'std::macro std::inline std::nvm',
+        placeHolder: 'std::macro std::opt std::nvm',
         ignoreFocusOut: true,
         validateInput: value => {
             try { parsePipelineInput(value); return undefined }

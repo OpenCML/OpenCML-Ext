@@ -39,6 +39,7 @@ func main(): int sync {
             const runInput = `camel "${program}" std::macro std::nvm`
             const run = vscode.commands.executeCommand('camel.runPipeline')
             await input.waitFor({ state: 'visible' })
+            assert.equal(await input.inputValue(), 'std::macro std::opt std::nvm', 'run input must use the default optimization pipeline')
             await input.fill(runInput)
             await input.press('Enter')
             assert.equal(await run, 0, 'composed CLI run failed')
@@ -49,7 +50,8 @@ func main(): int sync {
             assert.equal(await cancelledRun, undefined)
             const launch = vscode.commands.executeCommand('camel.inspectPipeline')
             await input.waitFor({ state: 'visible' })
-            await input.fill(`camel "${program}" std::macro std::inline std::nvm`)
+            assert.equal(await input.inputValue(), 'std::macro std::opt std::nvm', 'inspect input must use the default optimization pipeline')
+            await input.fill(`camel "${program}" std::macro std::opt std::nvm`)
             await input.press('Enter')
             await page.locator('.quick-input-widget').getByText(label('Pause before pass'), { exact: true }).waitFor()
             assert.equal(await input.inputValue(), 'std::macro', 'pause input must default to the first pass')
@@ -60,7 +62,7 @@ func main(): int sync {
             console.log('PIPELINE_COMPOSE_OK: pasted command, keyboard-only pause-before input and launch without launch.json')
         } else assert(await vscode.debug.startDebugging(undefined, {
             type: 'camel', request: 'launch', name: 'Pipeline UI', program,
-            passes: ['std::macro', 'std::inline', 'std::nvm'], stopOnPassEntry: true
+            passes: ['std::macro', 'std::opt', 'std::nvm'], stopOnPassEntry: true
         }))
         session = vscode.debug.activeDebugSession
         let frame
@@ -91,7 +93,7 @@ func main(): int sync {
         await frame.getByRole('button', { name: label('Return to current stop'), exact: true }).click()
         await frame.waitForFunction(text => document.querySelector('.gir-text')?.textContent === text, after)
         await next.click()
-        await frame.waitForFunction(() => document.querySelector('.debug-position')?.textContent.includes('std::inline'))
+        await frame.waitForFunction(() => document.querySelector('.debug-position')?.textContent.includes('std::opt'))
         await frame.getByRole('button', { name: label('Graph'), exact: true }).click()
         await frame.locator('.gir-node').first().waitFor({ state: 'visible' })
         await vscode.commands.executeCommand('notifications.clearAll')
@@ -145,15 +147,15 @@ func main(): int sync {
             await input.press('Enter')
             await page.locator('.quick-input-widget').getByText(label('Pause before pass'), { exact: true }).waitFor()
             assert.equal(await input.inputValue(), 'std::macro')
-            await input.fill('std::inline')
+            await input.fill('std::opt')
             await input.press('Enter')
             assert(await launch)
             for (let i = 0; i < 100 && sessions.length === sessionCount; i++) await new Promise(r => setTimeout(r, 100))
             session = sessions.at(-1)
             assert.deepEqual(session.configuration.passBreakpoints, [1])
             for (let i = 0; i < 100 && stops.at(-1).pipeline?.index !== 1; i++) await new Promise(r => setTimeout(r, 100))
-            assert.equal(stops.at(-1).pipeline?.index, 1, 'pause before inline must show the graph after macro')
-            console.log('PIPELINE_BEFORE_OK: Enter defaults to before macro; named inline pauses after macro')
+            assert.equal(stops.at(-1).pipeline?.index, 1, 'pause before opt must show the graph after macro')
+            console.log('PIPELINE_BEFORE_OK: Enter defaults to before macro; named opt pauses after macro')
         }
         console.log('PIPELINE_UI_OK: actual macro graph, history/current separation, pass stepping, runtime handoff, multiple sessions, restart and narrow layout')
         console.log('PIPELINE_SCREENSHOTS:', workspace.uri.fsPath)

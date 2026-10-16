@@ -1,4 +1,6 @@
-## 1.12.1
+## 1.12.2
+
+- Use `std::macro std::opt std::nvm` as the default pass pipeline in quick inputs and launch templates. Preserve previously saved user pipelines.
 
 - Mark the paused GIR node with an external execution arrow and outer frame instead of a yellow fill. Preserve category colors, selection borders and separate breakpoint outlines, including diamond control nodes.
 
