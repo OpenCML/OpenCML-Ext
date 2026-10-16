@@ -101,7 +101,8 @@ function tokenize(src: string): Token[] {
             let out = ''
             while (j < n) {
                 if (src[j] === '\\' && j + 1 < n) {
-                    out += src[j + 1]
+                    const escaped = src[j + 1]
+                    out += ({ n: '\n', l: '\n', r: '\n', t: '\t', '\\': '\\', '"': '"', '\n': '' } as Record<string, string>)[escaped] ?? '\\' + escaped
                     j += 2
                     continue
                 }

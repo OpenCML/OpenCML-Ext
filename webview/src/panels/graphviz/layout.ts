@@ -1,6 +1,7 @@
 // Map a parsed DOT graph + a graphviz JSON layout onto Vue Flow nodes/edges.
 // Clusters become background box nodes (not parents), members stay absolute.
 import type { DotGraph, DotSubgraph } from './dot'
+import { loopDetails, type LoopDetails } from './loops'
 
 export interface FlowNode {
     id: string
@@ -11,6 +12,7 @@ export interface FlowNode {
         nodeType: string
         role?: string
         enterScope?: string
+        loop?: LoopDetails
         collapsed?: boolean
         count?: number
         attrs: Record<string, string>
@@ -131,6 +133,7 @@ export function buildFlowModel(dot: DotGraph, gv: GvJson, arrangement: 'original
                 s.width = 64
                 s.height = 24
             }
+            if (node.attrs.type === 'LOOP') { s.width = 180; s.height = 80 }
             nodeIds.add(key)
             nodes.push({
                 id: key,
@@ -166,6 +169,10 @@ export function buildFlowModel(dot: DotGraph, gv: GvJson, arrangement: 'original
         edges.push({ id: `${source}->${target}#${edges.length}`, source, target, label: edge.attrs.label, edgeType: edge.attrs.type ?? '' })
     }
 
+    for (const node of nodes) {
+        const loop = loopDetails({ nodes, edges }, node)
+        if (loop) node.data.loop = loop
+    }
     if (arrangement === 'vertical') stackGraphs(dot, nodes)
 
     // clusters first so they render below member nodes

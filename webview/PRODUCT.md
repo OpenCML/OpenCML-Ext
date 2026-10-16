@@ -8,3 +8,5 @@ Camel developers inspect compiler GIR, node types, connections and source locati
 
 ## Design principles
 Preserve the existing compact toolbar and graph interactions. Follow the editor theme and system typography. Keep graph and text views synchronized. Provide keyboard-accessible controls and readable loading/error states. Avoid decorative UI, animation and blocking dialogs.
+
+Structured loops expose separate condition/body routes on compact cards. Keep state and capture details in the inspector, explain returned state in a small context bar, and retain breadcrumbs and a direct return to the owning LOOP. Do not guess ambiguous graph targets or add verbose edge labels.

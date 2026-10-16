@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { t } from '../../../../client/src/localization'
 
-import { onMounted, onUnmounted, ref, computed, nextTick, watch } from 'vue'
+import { onMounted, onUnmounted, ref, computed, nextTick, watch, provide } from 'vue'
 import { VueFlow, useVueFlow, MarkerType, type Node, type Edge, type NodeTypesObject } from '@vue-flow/core'
 import { Graphviz } from '@hpcc-js/wasm/graphviz'
 import { parseDot, isDotGraph } from './dot'
 import { buildFlowModel, type FlowNode, type FlowEdge } from './layout'
 import { neighbors } from './explore'
 import { focusGraph, parentScope, moduleEntries } from './hierarchy'
+import { loopLayoutDot, loopScope, loopLabel, stateLabel } from './loops'
 import GirNode from './components/GirNode.vue'
 import GirCluster from './components/GirCluster.vue'
 import PanelIcon from './components/PanelIcon.vue'
@@ -106,6 +107,8 @@ const arrangement = ref<'vertical' | 'original'>(vscode.getState()?.arrangement 
 const browsing = ref(vscode.getState()?.browsing === 'flat' ? 'flat' : 'hierarchy')
 const scope = ref('')
 const fullModel = ref<{ nodes: FlowNode[]; edges: FlowEdge[] }>({ nodes: [], edges: [] })
+const currentLoopScope = computed(() => browsing.value === 'hierarchy' ? loopScope(fullModel.value, scope.value) : undefined)
+provide('gir-open-subgraph', openSubgraph)
 const showModuleFunctions = ref(false)
 const moduleEntryIds = computed(() => moduleEntries(fullModel.value))
 const moduleFunctions = computed(() => fullModel.value.nodes.filter(n => n.type === 'cluster' && !parentScope(n.id)))
@@ -254,6 +257,24 @@ function navigateScope(next: string) {
     selectedNode.value = selections.get(`${browsing.value}:${scope.value}`) ?? null
     applyScope()
 }
+function openSubgraph(next: string) {
+    clearTimeout(nodeClickTimer)
+    if (!fullModel.value.nodes.some(n => n.type === 'cluster' && n.id === next)) return
+    if (browsing.value !== 'hierarchy') {
+        cameras.set(`${browsing.value}:${scope.value}`, { ...viewport.value })
+        const owner = loopScope(fullModel.value, next)
+        scope.value = owner ? parentScope(owner.loop.id) : parentScope(next)
+        browsing.value = 'hierarchy'
+        vscode.setState({ view: view.value, arrangement: arrangement.value, browsing: browsing.value })
+    }
+    navigateScope(next)
+}
+function returnToLoop() {
+    const owner = currentLoopScope.value
+    if (!owner) return
+    navigateScope(parentScope(owner.loop.id))
+    selectedNode.value = { id: owner.loop.id, ...owner.loop.data }
+}
 function goBackScope() {
     const previous = scopeHistory.value.pop()
     if (previous === undefined) return
@@ -385,9 +406,9 @@ async function renderDotMessage(message: RenderMessage) {
     }
     status.value = t("Computing layout…")
     try {
-        const layoutJson = await graphviz.layout(message.dot, 'json', 'dot')
-        const gv = JSON.parse(layoutJson)
         const dot = parseDot(message.dot)
+        const layoutJson = await graphviz.layout(loopLayoutDot(message.dot, dot), 'json', 'dot')
+        const gv = JSON.parse(layoutJson)
         const model = buildFlowModel(dot, gv, arrangement.value)
         if (model.nodes.length === 0) {
             throw new Error('layout produced no nodes')
@@ -428,7 +449,7 @@ function onNodeClick(event: { node: Node; event: MouseEvent | TouchEvent }) {
         return
     }
     // Avoid opening an inspector over the second click of FUNC navigation.
-    if (n.data.enterScope) {
+    if (n.data.enterScope || n.data.loop?.body?.scope) {
         nodeClickTimer = setTimeout(() => { selectedNode.value = { id: n.id, ...(n.data as FlowNode['data']) } }, 300)
     } else selectedNode.value = { id: n.id, ...(n.data as FlowNode['data']) }
 }
@@ -436,10 +457,14 @@ function onNodeClick(event: { node: Node; event: MouseEvent | TouchEvent }) {
 function onNodeDoubleClick(event: { node: Node }) {
     clearTimeout(nodeClickTimer)
     const n = event.node
+    if (n.data.loop?.body?.scope) { openSubgraph(n.data.loop.body.scope); return }
     if (browsing.value === 'hierarchy') {
         if (n.type === 'cluster') { navigateScope(n.id); return }
         if (n.data.enterScope) { navigateScope(n.data.enterScope); return }
     }
+    toggleNodeBreakpoint(n)
+}
+function toggleNodeBreakpoint(n: Pick<Node, 'id' | 'type' | 'data'>) {
     if (n.type !== 'gir') return
     if (n.id.startsWith('boundary:')) return
     if (['ARGS', 'EXIT'].includes(n.data.nodeType)) return
@@ -688,6 +713,13 @@ onUnmounted(() => {
             <div v-if="girText" class="line-numbers" aria-hidden="true"><div v-for="n in lineCount" :key="n">{{ n }}</div></div>
             <pre class="gir-text" tabindex="0" :aria-label='t("GIR source text")'>{{ girText || t("No GIR yet. Open a CML file and refresh.") }}</pre>
         </div>
+        <nav v-if="view === 'graph' && currentLoopScope && !loading" class="loop-context" :aria-label="t('Loop subgraph')">
+            <button class="loop-back" @click="returnToLoop">← {{ t('Back to LOOP') }}</button>
+            <strong>{{ currentLoopScope.role === 'body' ? t('Loop body') : t('Condition') }}</strong>
+            <span>{{ currentLoopScope.role === 'body' ? t('Returns the next state: {0}', stateLabel(currentLoopScope.details)) : t('true continues; false stops') }}</span>
+            <button v-if="currentLoopScope.role === 'body' && currentLoopScope.details.condition?.scope" class="loop-switch" @click="openSubgraph(currentLoopScope.details.condition.scope)">{{ t('Condition') }} ↗</button>
+            <button v-if="currentLoopScope.role === 'condition' && currentLoopScope.details.body?.scope" class="loop-switch" @click="openSubgraph(currentLoopScope.details.body.scope)">{{ t('Loop body') }} ↗</button>
+        </nav>
         <div v-show="view === 'graph' && !loading" class="canvas" ref="canvas">
             <section v-if="searchOpen" class="graph-search" :aria-label='t("Search nodes")'>
                 <div class="search-input-row"><input ref="searchInput" v-model="searchQuery" :aria-label='t("Search name, type or ID")' :placeholder='t("Search name, type or ID")' @keydown.enter.prevent="nextResult($event.shiftKey)" />
@@ -714,10 +746,23 @@ onUnmounted(() => {
             </div>
             <aside v-if="selectedNode" class="info" :aria-label='t("Node details")'>
                 <div class="info-heading"><span> {{ t("Node details") }} </span><button class="icon-button" :aria-label='t("Close node details")' @click="selectedNode = null"><PanelIcon name="close" :size="14" /></button></div>
-                <div class="node-name">{{ selectedNode.label }}</div>
+                <div class="node-name">{{ selectedNode.loop ? loopLabel(selectedNode.loop) : selectedNode.label }}</div>
                 <dl><dt>ID</dt><dd>{{ selectedNode.id }}</dd><dt> {{ t("Kind") }} </dt><dd>{{ selectedNode.nodeType }}</dd><template v-if="selectedNode.attrs.value_type"><dt>{{ selectedNode.nodeType === 'FILL' ? t("Assembled type") : t("Data type") }}</dt><dd>{{ selectedNode.attrs.value_type }}</dd></template><template v-if="selectedNode.attrs.param_kind"><dt> {{ t("Parameter") }} </dt><dd>{{ ({ normal: t("Normal parameter"), with: t("Context parameter"), capture: t("Captured variable") } as Record<string, string>)[selectedNode.attrs.param_kind] || selectedNode.attrs.param_kind }}</dd></template><template v-if="selectedNode.attrs.param_index !== undefined"><dt> {{ t("Index") }} </dt><dd>{{ selectedNode.attrs.param_index }} {{ t("(zero-based)") }} </dd></template><template v-if="selectedNode.role"><dt> {{ t("Role") }} </dt><dd>{{ selectedNode.role }}</dd></template><template v-if="selectedNode.attrs?.span"><dt> {{ t("Location") }} </dt><dd>{{ selectedNode.attrs.srcfile }}:{{ selectedNode.attrs.span }}</dd></template></dl>
+                <section v-if="selectedNode.loop" class="loop-detail" :aria-label="t('Loop structure')">
+                    <div class="loop-graph-links">
+                        <button v-if="selectedNode.loop.condition" :disabled="!selectedNode.loop.condition.scope" :title="selectedNode.loop.condition.name" @click="selectedNode.loop.condition.scope && openSubgraph(selectedNode.loop.condition.scope)">{{ t('Condition') }} ↗</button>
+                        <button :disabled="!selectedNode.loop.body?.scope" :title="selectedNode.loop.body?.name" @click="selectedNode.loop.body?.scope && openSubgraph(selectedNode.loop.body.scope)">{{ t('Loop body') }} ↗</button>
+                    </div>
+                    <h3>{{ t('Initial state') }}</h3>
+                    <dl v-if="selectedNode.loop.states.length"><template v-for="s in selectedNode.loop.states" :key="s.name"><dt>{{ s.name }}</dt><dd>{{ s.value ?? '—' }}<small v-if="s.type">{{ s.type }}</small></dd></template></dl>
+                    <p v-else>{{ t('State names unavailable in this export') }}</p>
+                    <template v-if="selectedNode.loop.iterable"><h3>{{ t('Iterated element') }}</h3><dl><dt>{{ selectedNode.loop.iterable.name }}</dt><dd>{{ selectedNode.loop.iterable.value ?? '—' }}</dd></dl></template>
+                    <template v-if="selectedNode.loop.captures.length"><h3>{{ t('Captured inputs') }}</h3><dl><template v-for="s in selectedNode.loop.captures" :key="s.name"><dt>{{ s.name }}</dt><dd>{{ s.value ?? '—' }}<small v-if="s.type">{{ s.type }}</small></dd></template></dl></template>
+                    <p>{{ t('Body output feeds the next iteration. LOOP output is the final state.') }}</p>
+                    <button class="source-link" @click="toggleNodeBreakpoint({ id: selectedNode.id, type: 'gir', data: selectedNode })">{{ t('Toggle breakpoint') }}</button>
+                </section>
                 <button v-if="selectedNode.attrs?.span && selectedNode.attrs?.srcfile" class="source-link" @click="revealSelectedSource"> {{ t("Go to source") }} <PanelIcon name="arrow" :size="14" /></button>
-                <div class="hint">{{ ['ARGS', 'EXIT'].includes(selectedNode.nodeType) ? (selectedNode.nodeType === 'ARGS' ? t("Subgraph input boundary, grouping parameter inputs. ") : t("Subgraph output boundary, connected to the actual exit node. ")) + t("This is a visual marker, not a runtime node. Breakpoints are unavailable.") : selectedNode.enterScope ? t("Double-click to enter subgraph") : t("Double-click to toggle breakpoint") }}</div>
+                <div class="hint">{{ selectedNode.loop ? t('Double-click to enter the loop body') : ['ARGS', 'EXIT'].includes(selectedNode.nodeType) ? (selectedNode.nodeType === 'ARGS' ? t("Subgraph input boundary, grouping parameter inputs. ") : t("Subgraph output boundary, connected to the actual exit node. ")) + t("This is a visual marker, not a runtime node. Breakpoints are unavailable.") : selectedNode.enterScope ? t("Double-click to enter subgraph") : t("Double-click to toggle breakpoint") }}</div>
             </aside>
         </div>
         <footer class="statusbar" role="status" aria-live="polite">
@@ -845,7 +890,20 @@ h1 { margin: 0; font-size: 13px; font-weight: 650; letter-spacing: .04em; }
 .status-dot.failed { background: var(--vscode-errorForeground, #f48771); }
 .status-dot.busy { background: var(--gir-muted); }
 .status-pass { margin-left: auto; font-family: var(--gir-mono); }
-.info { position: absolute; right: 16px; top: 16px; width: min(270px, calc(100% - 32px)); background: var(--gir-bg); border: 1px solid var(--gir-line); border-radius: 8px; padding: 12px 14px; box-shadow: 0 6px 24px #00000012; z-index: 4; }
+.info { position: absolute; right: 16px; top: 16px; width: min(270px, calc(100% - 32px)); max-height: calc(100% - 32px); overflow-y: auto; box-sizing: border-box; background: var(--gir-bg); border: 1px solid var(--gir-line); border-radius: 8px; padding: 12px 14px; box-shadow: 0 6px 24px #00000012; z-index: 4; }
+.loop-context { display: flex; align-items: center; gap: 10px; padding: 5px 16px; border-bottom: 1px solid var(--gir-line); font-size: 10px; flex-wrap: wrap; }
+.loop-context strong { font-weight: 500; }
+.loop-context > span { color: var(--gir-muted); }
+.loop-context button, .loop-graph-links button { border: 1px solid var(--gir-line); border-radius: 4px; padding: 4px 7px; font: inherit; color: var(--gir-fg); background: transparent; cursor: pointer; }
+.loop-context button:hover, .loop-graph-links button:hover:not(:disabled) { background: var(--vscode-toolbar-hoverBackground); }
+.loop-switch { margin-left: auto; }
+.loop-context button:focus-visible, .loop-graph-links button:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 2px; }
+.loop-graph-links { display: flex; gap: 8px; }
+.loop-graph-links button:disabled { color: var(--vscode-disabledForeground); cursor: default; }
+.loop-detail { border-top: 1px solid var(--gir-line); margin-top: 12px; padding-top: 12px; font-size: 11px; }
+.loop-detail h3 { font: 500 11px/1.5 var(--vscode-font-family); margin: 12px 0 6px; }
+.loop-detail p { font-size: 10px; line-height: 1.6; margin: 8px 0; color: var(--gir-muted); }
+.loop-detail small { display: block; color: var(--gir-muted); }
 .info-heading { display: flex; justify-content: space-between; align-items: center; color: var(--gir-muted); font-size: 10px; }
 .info-heading .icon-button { width: 22px; height: 22px; margin-right: -5px; }
 .node-name { font: 12px/1.5 var(--gir-mono); overflow-wrap: anywhere; margin: 10px 0 14px; }

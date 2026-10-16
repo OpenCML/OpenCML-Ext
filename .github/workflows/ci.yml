@@ -29,6 +29,7 @@ jobs:
           node scripts/gir-source-test.mjs
           node scripts/gir-hierarchy-test.mjs
           node scripts/gir-explore-test.mjs
+          node scripts/gir-loop-test.mjs
           npx tsc --noEmit --skipLibCheck --esModuleInterop --target es2020 --module commonjs client/src/extension.ts server/src/server.ts
       - run: npm run build
       - name: Check tag version

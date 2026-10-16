@@ -1,3 +1,10 @@
+## 1.9.0
+
+- Make LOOP nodes navigable: separate condition/body buttons, double-click body entry, nested-loop breadcrumbs, sibling switching and return to the owning LOOP.
+- Show initial state, iterated elements and captured inputs in LOOP details. Explain next-state/condition results inside subgraphs; keep breakpoints available in the inspector.
+- Hide referenced loop subgraph cards in hierarchy mode, reserve compact LOOP card geometry and preserve fallback cards for unresolved/ambiguous references.
+- Decode quoted DOT escapes correctly, including multiline styled labels. Add real Camel export and bilingual VS Code interaction coverage.
+
 ## 1.8.2
 
 - Default Camel inlay hints to VS Code's hold-to-show mode (`offUnlessPressed`, Ctrl+Alt), respecting explicit editor preferences.

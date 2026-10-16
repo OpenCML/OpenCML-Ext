@@ -1,5 +1,6 @@
 import { t } from '../../../../client/src/localization'
 import type { FlowModel, FlowNode } from './layout'
+import { resolveGraphName } from './loops'
 
 export function parentScope(id: string): string { return id.slice(0, Math.max(0, id.lastIndexOf('/'))) }
 
@@ -10,10 +11,7 @@ export function graphTarget(model: FlowModel, node: FlowNode): string | undefine
     const name = node.data.nodeType === 'FUNC' ? node.data.label : node.data.nodeType === 'DATA'
         ? /^Function\(graph=([^,]+), tupleSlots=/.exec(node.data.label)?.[1] : undefined
     if (!name) return undefined
-    const matches = model.nodes.filter(n => n.type === 'cluster' && n.data.label === name)
-    const local = matches.filter(n => parentScope(n.id) === parentScope(node.id))
-    if (local.length) return local.length === 1 ? local[0].id : undefined
-    return matches.length === 1 ? matches[0].id : undefined
+    return resolveGraphName(model, node, name)
 }
 
 export function moduleEntries(model: FlowModel): Set<string> {
@@ -30,16 +28,19 @@ export function moduleEntries(model: FlowModel): Set<string> {
 export function focusGraph(model: FlowModel, scope: string, compactModule = false): FlowModel {
     const direct = model.nodes.filter(n => parentScope(n.id) === scope)
     const children = direct.filter(n => n.type === 'cluster')
-    const references = new Map<string, string>()
+    const references = new Map<string, string[]>()
     for (const node of direct) {
         const target = graphTarget(model, node)
-        if (target) references.set(node.id, target)
+        const targets = node.data.loop
+            ? [node.data.loop.condition?.scope, node.data.loop.body?.scope].filter((s): s is string => !!s)
+            : target ? [target] : []
+        if (targets.length) references.set(node.id, targets)
     }
-    const referenced = new Set(references.values())
+    const referenced = new Set([...references.values()].flat())
     const cards = children.filter(n => !referenced.has(n.id) && !(compactModule && !scope)).map(n => ({ ...n,
         position: { x: 0, y: 0 }, data: { ...n.data, collapsed: true, width: 220, height: 76,
             count: model.nodes.filter(child => child.type === 'gir' && child.id.startsWith(n.id + '/')).length } }))
-    const local = direct.filter(n => n.type !== 'cluster').map(n => ({ ...n, position: { ...n.position }, data: { ...n.data, enterScope: references.get(n.id) } }))
+    const local = direct.filter(n => n.type !== 'cluster').map(n => ({ ...n, position: { ...n.position }, data: { ...n.data, enterScope: n.data.loop ? n.data.loop.body?.scope : references.get(n.id)?.[0] } }))
     const left = Math.min(...local.map(n => n.position.x))
     const top = Math.min(...local.map(n => n.position.y))
     const localWidth = local.length ? Math.max(...local.map(n => n.position.x + n.data.width)) - left : 0
@@ -54,7 +55,7 @@ export function focusGraph(model: FlowModel, scope: string, compactModule = fals
         if (visible.has(id)) return id
         const child = children.find(child => id.startsWith(child.id + '/'))
         if (!child) return undefined
-        return cards.find(card => card.id === child.id)?.id ?? [...references].find(([, target]) => target === child.id)?.[0]
+        return cards.find(card => card.id === child.id)?.id ?? [...references].find(([, targets]) => targets.includes(child.id))?.[0]
     }
     const right = Math.max(0, ...nodes.map(n => n.position.x + n.data.width))
     const boundary = new Map<string, string>()
