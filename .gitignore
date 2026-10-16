@@ -11,3 +11,6 @@ client/server
 tsconfig.tsbuildinfo
 *.tsbuildinfo
 dist/
+
+# Local isolated Camel runtime snapshots
+.local/

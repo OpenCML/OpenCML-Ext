@@ -1,6 +1,7 @@
 .vscode/
 .vscode-test/
 .github/**
+.local/**
 
 # 忽略所有源文件和构建配置
 **/*.ts
