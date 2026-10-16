@@ -18,3 +18,6 @@ Debug session graphs come from native DAP and the stopped worker, never from rec
 editor. A compact strip identifies the actual initial/after-pass/runtime stop, offers explicit
 pass stepping, and separates inspected history from execution position. Standard source
 stepping cannot silently mean a compiler step. Preserve theme tokens and wrap at narrow widths.
+
+Hierarchy opens a uniquely referenced module-entry main directly, with a route back to the
+module. Preserve explicit navigation choices; a library graph merely named main is not an entry.

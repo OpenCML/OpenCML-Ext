@@ -8,7 +8,7 @@ import { parseDot, isDotGraph } from './dot'
 import { parseGirJson } from './jgir'
 import { buildFlowModel, type FlowNode, type FlowEdge } from './layout'
 import { neighbors } from './explore'
-import { focusGraph, parentScope, moduleEntries } from './hierarchy'
+import { focusGraph, parentScope, moduleEntries, initialScope } from './hierarchy'
 import { loopLayoutDot, loopScope, loopLabel, stateLabel } from './loops'
 import GirNode from './components/GirNode.vue'
 import GirCluster from './components/GirCluster.vue'
@@ -118,21 +118,23 @@ const cameras = new Map<string, { x: number; y: number; zoom: number }>()
 const selections = new Map<string, typeof selectedNode.value>()
 // Keep independent cameras and navigation for each source and GIR pass during this panel session.
 let documentKey = ''
-const documentViews = new Map<string, { scope: string; history: string[]; cameras: typeof cameras; selections: typeof selections }>()
+let scopeWasChosen = false
+const documentViews = new Map<string, { scope: string; chosen: boolean; history: string[]; cameras: typeof cameras; selections: typeof selections }>()
 function saveDocumentView() {
     if (!rememberViewport.value || !documentKey || !fullModel.value.nodes.length) return
     cameras.set(`${browsing.value}:${scope.value}`, { ...viewport.value })
     selections.set(`${browsing.value}:${scope.value}`, selectedNode.value)
     documentViews.delete(documentKey)
-    documentViews.set(documentKey, { scope: scope.value, history: [...scopeHistory.value], cameras: new Map(cameras), selections: new Map(selections) })
+    documentViews.set(documentKey, { scope: scope.value, chosen: scopeWasChosen, history: [...scopeHistory.value], cameras: new Map(cameras), selections: new Map(selections) })
     if (documentViews.size > 30) documentViews.delete(documentViews.keys().next().value!)
 }
 function restoreDocumentView() {
     const saved = rememberViewport.value ? documentViews.get(documentKey) : undefined
     if (!saved) return
     const exists = (id: string) => !id || fullModel.value.nodes.some(n => n.type === 'cluster' && n.id === id)
-    scope.value = exists(saved.scope) ? saved.scope : ''
-    scopeHistory.value = saved.history.filter(exists)
+    scopeWasChosen = saved.chosen && exists(saved.scope)
+    scope.value = scopeWasChosen ? saved.scope : initialScope(fullModel.value)
+    scopeHistory.value = scopeWasChosen ? saved.history.filter(exists) : scope.value ? [''] : []
     saved.cameras.forEach((camera, key) => cameras.set(key, camera))
     saved.selections.forEach((selection, key) => selections.set(key, selection))
 }
@@ -250,6 +252,7 @@ function applyScope() {
     void nextTick(fitLayout)
 }
 function navigateScope(next: string) {
+    scopeWasChosen = true
     if (next !== scope.value) scopeHistory.value.push(scope.value)
     showModuleFunctions.value = false
     cameras.set(`${browsing.value}:${scope.value}`, { ...viewport.value })
@@ -277,6 +280,7 @@ function returnToLoop() {
     selectedNode.value = { id: owner.loop.id, ...owner.loop.data }
 }
 function goBackScope() {
+    scopeWasChosen = true
     const previous = scopeHistory.value.pop()
     if (previous === undefined) return
     cameras.set(`${browsing.value}:${scope.value}`, { ...viewport.value })
@@ -285,6 +289,10 @@ function goBackScope() {
     applyScope()
 }
 function changeBrowsing() {
+    if (browsing.value === 'hierarchy' && !scope.value) {
+        scope.value = initialScope(fullModel.value)
+        scopeHistory.value = scope.value ? [''] : []
+    }
     vscode.postMessage({ command: 'browsingChanged', value: browsing.value })
     selectedNode.value = null
     vscode.setState({ view: view.value, arrangement: arrangement.value, browsing: browsing.value })
@@ -387,6 +395,7 @@ async function renderDotMessage(message: RenderMessage) {
     cameras.clear()
     selections.clear()
     scope.value = ''
+    scopeWasChosen = false
     fullModel.value = { nodes: [], edges: [] }
     girText.value = message.dot || ''
     errorText.value = message.error || ''
@@ -424,6 +433,8 @@ async function renderDotMessage(message: RenderMessage) {
             throw new Error('layout produced no nodes')
         }
         fullModel.value = model
+        scope.value = browsing.value === 'hierarchy' ? initialScope(model) : ''
+        scopeHistory.value = scope.value ? [''] : []
         restoreDocumentView()
         applyScope()
         const savedSelection = selections.get(`${browsing.value}:${scope.value}`)

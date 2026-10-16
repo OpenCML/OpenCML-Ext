@@ -25,6 +25,16 @@ export function moduleEntries(model: FlowModel): Set<string> {
     return result
 }
 
+/** Enter only a main graph reached by an actual module-level function-value call.
+ * A library graph named main, an unrelated call or ambiguous entries are not sufficient. */
+export function initialScope(model: FlowModel): string {
+    const entries = [...moduleEntries(model)].filter(id => {
+        const graph = model.nodes.find(n => n.type === 'cluster' && n.id === id)
+        return graph && /(?:^|::)main$/.test(graph.data.label)
+    })
+    return entries.length === 1 ? entries[0] : ''
+}
+
 // Collapse descendants into cards without changing stable node/edge identities.
 export function focusGraph(model: FlowModel, scope: string, compactModule = false): FlowModel {
     const direct = model.nodes.filter(n => parentScope(n.id) === scope)
