@@ -1,3 +1,8 @@
+## 1.11.5
+
+- Replace diamond control nodes with compact 80×40 rectangles and a subtle theme-aware amber background. Preserve double-side function frames and plain single-frame operations.
+- Mark functions, function values and calls with a small slanted function icon beside the name.
+
 ## 1.11.4
 
 - Distinguish GIR node families with shape and restrained theme colors: rounded double-side function nodes, single-frame operations, and diamond branch/merge/gate nodes. Keep values neutral and preserve compact boundaries, handles and debugger state cues.

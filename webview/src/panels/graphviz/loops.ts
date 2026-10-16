@@ -61,7 +61,7 @@ export function loopLayoutDot(raw: string, dot: DotGraph): string {
     const walk = (sub: DotSubgraph) => {
         for (const node of sub.nodes) {
             if (node.attrs.type === 'LOOP') overrides.push(`${JSON.stringify(node.id)} [label="", fixedsize=true, width=${148 / 72}, height=${56 / 72}];`)
-            if (['BRCH', 'JOIN', 'GATE'].includes(node.attrs.type)) overrides.push(`${JSON.stringify(node.id)} [label="", shape=diamond, fixedsize=true, width=${96 / 72}, height=${68 / 72}];`)
+            if (['BRCH', 'JOIN', 'GATE'].includes(node.attrs.type)) overrides.push(`${JSON.stringify(node.id)} [label="", shape=box, fixedsize=true, width=${80 / 72}, height=${40 / 72}];`)
         }
         sub.subgraphs.forEach(walk)
     }

@@ -57,14 +57,15 @@ exports.run = async (vscode, workspace) => {
         await functionCard.waitFor()
         assert.equal(await functionCard.locator('.gir-type').innerText(), label('Function value'))
         assert((await functionCard.getAttribute('title')).includes('Function(graph=main,'))
-        assert.equal(await functionCard.locator('.gir-label').innerText(), 'ƒmain')
+        assert.equal(await functionCard.locator('.gir-label').innerText(), 'main')
+        assert.equal(await functionCard.locator('.function-symbol').count(), 1)
         const centers = await frame.locator('.gir-node').evaluateAll(nodes => {
             const center = label => {
                 const node = nodes.find(node => label(node.querySelector('.gir-label')?.textContent || ''))
                 const rect = node?.getBoundingClientRect()
                 return rect ? rect.x + rect.width / 2 : null
             }
-            return [center(label => label === 'ƒmain'), center(label => label === 'CALL')]
+            return [center(label => label === 'main'), center(label => label === 'CALL')]
         })
         assert(centers.every(center => center !== null) && Math.abs(centers[0] - centers[1]) < 2,
             `capped Function node and CALL must remain centered: ${centers}`)
@@ -142,8 +143,13 @@ exports.run = async (vscode, workspace) => {
         // Exercise nested sibling graphs without depending on runtime optimizations.
         const families = 'digraph G { n [type="DATA",label="50000"]; f [type="FUNC",label="run"]; s [type="DATA",label="arm_call_then_effect r={}"]; a [type="OPER",label=":str/format"]; b [type="OPER",label=":io/println"]; z [type="DATA",label="0"]; g [type="GATE",label="GATE"]; x [type="EXIT",label="EXIT"]; n -> f [type="NORM"]; f -> a [type="WITH"]; s -> a [type="NORM"]; a -> b [type="NORM"]; b -> g [type="CTRL"]; z -> g [type="NORM"]; g -> x [type="NORM"]; }'
         await frame.evaluate(dot => window.dispatchEvent(new MessageEvent('message', { data: { command: 'render', dot } })), families)
-        await frame.locator('.family-control .control-outline').waitFor()
+        await frame.locator('.family-control').waitFor()
+        assert.equal(await frame.locator('.control-outline, .diamond').count(), 0)
+        const controlSize = await frame.locator('.family-control').evaluate(node => ({ width: node.offsetWidth, height: node.offsetHeight }))
+        assert.deepEqual(controlSize, { width: 80, height: 40 })
         assert.equal(await frame.locator('.family-function').count(), 1)
+        assert.equal(await frame.locator('.family-function .function-symbol').count(), 1)
+        assert.equal(await frame.locator('.family-operation .function-symbol, .family-value .function-symbol').count(), 0)
         assert.equal(await frame.locator('.family-operation').count(), 2)
         assert.equal(await frame.locator('.family-value').count(), 3)
         await frame.getByRole('button', { name: label('Fit to view'), exact: true }).click()

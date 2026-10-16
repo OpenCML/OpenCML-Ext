@@ -27,8 +27,10 @@ function glyph. Retain DATA semantics and the original runtime representation in
 never infer function identity from a display string. Layout uses the compact card dimensions.
 
 Node families use redundant visual cues without adding graph labels: rounded double-side
-function references/calls, plain single-frame operations, and diamond branch/merge/gate
-nodes. LOOP keeps a compact rectangle for its navigation controls. Plain values stay neutral. Derive families from runtime kinds and function metadata;
+function references/calls, plain single-frame operations, and compact control rectangles
+with a subtle amber background. Function nodes also carry a small slanted function icon.
+Avoid diamonds and oversized control geometry. LOOP keeps
+a compact rectangle for its navigation controls. Plain values stay neutral. Derive families from runtime kinds and function metadata;
 retain node dimensions, visible edge handles, loop actions and distinct debugger state cues.
 
 The secondary memory panel follows the selected native debug session. Read an aggregate once

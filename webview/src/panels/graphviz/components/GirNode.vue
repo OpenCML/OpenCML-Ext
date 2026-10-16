@@ -30,11 +30,6 @@ const family = computed(() => boundary.value ? 'boundary'
     : functionValue.value || ['FUNC', 'CALL'].includes(props.data.nodeType) ? 'function'
     : ['BRCH', 'JOIN', 'GATE', 'LOOP', 'SYNC'].includes(props.data.nodeType) ? 'control'
     : ['OPER', 'FILL', 'ACCS', 'CAST', 'COPY'].includes(props.data.nodeType) ? 'operation' : 'value')
-const diamond = computed(() => ['BRCH', 'JOIN', 'GATE'].includes(props.data.nodeType))
-const controlOutline = computed(() => {
-    const w = props.data.width, h = props.data.height
-    return `M ${w / 2},.5 L ${w - .5},${h / 2} L ${w / 2},${h - .5} L .5,${h / 2} Z`
-})
 const openSubgraph = inject<(scope: string) => void>('gir-open-subgraph')
 const nodeTitle = computed(() => {
     const data = props.data
@@ -59,11 +54,10 @@ const nodeTitle = computed(() => {
         :class="[
             `t-${data.nodeType.toLowerCase()}`,
             `family-${family}`,
-            { selected, boundary, diamond, 'function-value': functionValue, breakpoint: !boundary && data.breakpoint, paused: !boundary && data.paused }
+            { selected, boundary, 'function-value': functionValue, breakpoint: !boundary && data.breakpoint, paused: !boundary && data.paused }
         ]"
         :style="{ width: `${data.width}px`, height: `${data.height}px` }"
     >
-        <svg v-if="diamond" class="control-outline" :viewBox="`0 0 ${data.width} ${data.height}`" aria-hidden="true"><path :d="controlOutline" /></svg>
         <template v-if="data.loop">
             <div class="loop-heading"><PanelIcon name="loop" :size="12" /><div class="gir-label" :title="nodeTitle">{{ loopLabel(data.loop) }}</div></div>
             <div class="loop-actions nodrag nopan">
@@ -72,7 +66,7 @@ const nodeTitle = computed(() => {
             </div>
         </template>
         <template v-else>
-            <div class="gir-label" :title="nodeTitle"><span v-if="functionValue" class="function-symbol" aria-hidden="true">ƒ</span>{{ boundary ? (data.nodeType === 'ARGS' ? t("Input") : t("Output")) : data.label }}</div>
+            <div class="gir-label" :title="nodeTitle"><PanelIcon v-if="family === 'function'" name="function" class="function-symbol" :size="12" />{{ boundary ? (data.nodeType === 'ARGS' ? t("Input") : t("Output")) : data.label }}</div>
             <div v-if="!boundary" class="gir-type">{{ functionValue ? t("Function value") : data.nodeType }}<span v-if="data.enterScope" :aria-label='t("Open subgraph")'>↗</span></div>
         </template>
         <Handle v-if="data.nodeType !== 'ARGS'" id="t" type="target" :position="Position.Top" />
@@ -97,19 +91,13 @@ const nodeTitle = computed(() => {
 .gir-type { color: var(--gir-muted, #9d9d9d); font-size: 8px; flex-shrink: 0; letter-spacing: .07em; line-height: 1.2; display: flex; align-items: center; justify-content: center; gap: 5px; }
 .gir-type::before { content: ''; width: 4px; height: 4px; border-radius: 50%; background: var(--node-accent); }
 .t-exit { --node-accent: var(--vscode-symbolIcon-eventForeground, #ee9d28); }
-.function-symbol { color: var(--node-accent); margin-right: 6px; }
+.function-symbol { color: var(--node-accent); margin-right: 5px; vertical-align: -2px; }
 .family-function { --node-accent: var(--vscode-charts-purple, #b180d7); --node-line: color-mix(in srgb, var(--node-accent) 55%, var(--node-base-line)); --node-fill: color-mix(in srgb, var(--node-accent) 4%, var(--gir-bg)); border-radius: 9px; padding-inline: 12px; }
 .family-function::after { content: ''; position: absolute; inset: 5px; border-inline: 1px solid color-mix(in srgb, var(--node-accent) 50%, transparent); border-radius: 4px; pointer-events: none; }
 .family-operation { --node-accent: var(--vscode-charts-blue, #3794ff); border-radius: 2px; }
 .family-operation .gir-type::before { border-radius: 0; }
-.family-control { --node-accent: var(--vscode-charts-orange, #d18616); --node-line: color-mix(in srgb, var(--node-accent) 40%, var(--node-base-line)); --node-fill: color-mix(in srgb, var(--node-accent) 3%, var(--gir-bg)); border-radius: 4px; box-shadow: none; }
-.diamond, .diamond:hover, .gir-node.diamond.selected, .gir-node.diamond.paused { border-color: transparent; background: transparent; padding: 0; }
-.diamond .gir-label { max-width: 65%; align-self: center; }
-.family-control .gir-type::before { border-radius: 0; transform: rotate(45deg); }
-.control-outline { position: absolute; inset: -1px; width: calc(100% + 2px); height: calc(100% + 2px); overflow: visible; pointer-events: none; }
-.control-outline path { fill: var(--node-fill); stroke: var(--node-line); stroke-width: 1; vector-effect: non-scaling-stroke; }
-.family-control > :not(.control-outline) { position: relative; }
-.family-control > :deep(.vue-flow__handle) { position: absolute; }
+.family-control { --node-accent: var(--vscode-charts-orange, #d18616); --node-line: color-mix(in srgb, var(--node-accent) 40%, var(--node-base-line)); --node-fill: color-mix(in srgb, var(--node-accent) 10%, var(--gir-bg)); border-radius: 4px; box-shadow: none; }
+.family-control .gir-type::before { width: 6px; height: 3px; border-radius: 1px; }
 .function-value .gir-type { letter-spacing: 0; }
 .t-loop { padding: 7px 8px 5px; gap: 0; box-shadow: none; }
 .loop-heading { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; }
