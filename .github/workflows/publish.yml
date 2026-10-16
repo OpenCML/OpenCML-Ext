@@ -30,6 +30,12 @@ jobs:
       contents: read
       id-token: write
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
       - uses: azure/login@v2
         with:
           client-id: ${{ env.AZURE_CLIENT_ID }}
@@ -42,6 +48,10 @@ jobs:
           test -n "$id"
           printf 'Marketplace identity ID: %s\n' "$id"
           printf 'Add `%s` as a Contributor to the Kogler7 publisher. This run does not publish an extension.\n' "$id" >> "$GITHUB_STEP_SUMMARY"
+      - name: Verify Marketplace publishing permission
+        run: |
+          npx vsce verify-pat Kogler7 --azure-credential
+          printf '\nPublisher permission verified for Kogler7. Ready for a version-tag release.\n' >> "$GITHUB_STEP_SUMMARY"
 
   build:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')

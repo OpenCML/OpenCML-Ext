@@ -12,13 +12,20 @@ credential with the GitHub Actions scenario:
 | Field | Value |
 | --- | --- |
 | Organization | `OpenCML` |
+| Organization ID (new portal) | `177179735` |
 | Repository | `OpenCML-Ext` |
+| Repository ID (new portal) | `668988583` |
 | Entity type | Environment |
 | Environment | `marketplace` |
 | Name | `github-marketplace` |
 | Issuer | `https://token.actions.githubusercontent.com` |
 | Subject | `repo:OpenCML/OpenCML-Ext:environment:marketplace` |
 | Audience | `api://AzureADTokenExchange` |
+
+The repository currently uses the legacy subject format (`use_immutable_subject:
+false`). If the new Azure form inserts numeric IDs into the subject, use its
+**Edit** link to set the exact subject above. An intentional future migration to
+immutable subjects must update both GitHub OIDC settings and the Azure credential.
 
 In GitHub repository settings, create the **marketplace** environment. Deployment
 rules must allow the bootstrap run on `wzj-dev` and subsequent `v*` release tags.
@@ -32,6 +39,10 @@ Read **Marketplace identity ID** from the job summary. In the Marketplace
 `Kogler7` publisher's **Members** page, add that identity as a **Contributor**.
 Use the ID returned by the profile API, not the application's client ID or the
 application object's ID. These identify different objects.
+
+The identity job also runs `vsce verify-pat Kogler7 --azure-credential`, which checks
+publishing permissions without uploading an extension. It may initially fail until
+the Contributor membership has been added. Re-run the failed job after that step.
 
 ## Release
 
