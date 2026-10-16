@@ -14,7 +14,7 @@ export async function launchPipeline(context: vscode.ExtensionContext, inspect: 
     const key = `debug.pipeline.${folder?.uri.toString() ?? 'standalone'}.${inspect ? 'inspect' : 'run'}`
     const saved = context.workspaceState.get<SavedPipeline>(key)
     const input = await vscode.window.showInputBox({
-        title: inspect ? t('Inspect a pass pipeline') : t('Run a pass pipeline'),
+        title: inspect ? t('Debug GIR Passes') : t('Run with Passes'),
         value: saved?.input ?? 'std::macro std::inline std::nvm',
         prompt: t('Enter passes in execution order, or paste camel "file.cml" pass1 pass2. No shell commands or CLI flags.'),
         placeHolder: 'std::macro std::inline std::nvm',
@@ -62,7 +62,7 @@ export async function launchPipeline(context: vscode.ExtensionContext, inspect: 
     for (const doc of dirty) if (!await doc.save() || doc.isDirty) return
     if (dirty.some(doc => doc.isDirty)) return
     const started = await vscode.debug.startDebugging(vscode.workspace.getWorkspaceFolder(uri) ?? folder, {
-        type: 'camel', request: 'launch', name: inspect ? t('Inspect a pass pipeline') : t('Run a pass pipeline'),
+        type: 'camel', request: 'launch', name: inspect ? t('Debug GIR Passes') : t('Run with Passes'),
         program, passes: parsed.passes, passBreakpoints: [pauseIndex],
         stopOnEntry: false, stepBy: 'line', frames: 'functions',
         cwd: (vscode.workspace.getWorkspaceFolder(uri) ?? folder)?.uri.fsPath ?? path.dirname(program)

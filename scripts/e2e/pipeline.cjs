@@ -28,6 +28,13 @@ func main(): int sync {
         browser = await chromium.connectOverCDP(`http://127.0.0.1:${process.env.E2E_CDP_PORT || 19338}`)
         if (process.env.E2E_COMPOSE_PIPELINE) {
             const page = browser.contexts().flatMap(c => c.pages())[0]
+            const chinese = /^zh/i.test(vscode.env.language)
+            await page.locator('.editor-actions .codicon-chevron-down').click()
+            const menu = page.locator('.monaco-menu')
+            await menu.getByText(chinese ? '运行 Pass…' : 'Run with Passes…', { exact: true }).waitFor()
+            await menu.getByText(chinese ? '逐遍调试 GIR…' : 'Debug GIR Passes…', { exact: true }).waitFor()
+            await page.screenshot({ path: path.join(workspace.uri.fsPath, 'pipeline-localized-menu.png') })
+            await page.keyboard.press('Escape')
             const input = page.locator('.quick-input-widget input[type="text"]')
             const runInput = `camel "${program}" std::macro std::nvm`
             const run = vscode.commands.executeCommand('camel.runPipeline')

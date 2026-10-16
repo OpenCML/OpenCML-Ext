@@ -1,3 +1,7 @@
+## 1.11.3
+
+- Clarify pipeline command names: Run with Passes / Debug GIR Passes, with matching localized menu, command-palette, input and session titles. Verify the actual editor submenu in Chinese and English.
+
 ## 1.11.2
 
 - Replace pause-point checkboxes with a keyboard-only pass-name input. Default to the first pass and pause before it executes; Next pass then advances manually. Repeated names target their first occurrence.
