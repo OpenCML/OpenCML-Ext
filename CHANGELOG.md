@@ -1,39 +1,12 @@
-## 1.11.8
+## 1.12.0
 
-- Color literal DATA values using Camel lexical scopes from the active editor theme and user TextMate overrides. Highlight mixed literal containers conservatively; preserve opaque values and function labels.
-- Render BRCH/JOIN as unfilled 44×44 diamonds using the normal node font size, distinct from rectangular GATE/SYNC markers.
-
-## 1.11.7
-
-- Hide unused top handles on DATA nodes. Preserve handles for actual incoming edges of every kind, including full-graph and projected hierarchy connections.
-
-## 1.11.6
-
-- Give operations a small corner radius. Render GATE/BRCH/JOIN/SYNC as compact single-line 44×26 labels without repeating the kind.
-- Let function cards grow with their names, reserving icon/frame space consistently in both display and layout while retaining the existing 220px cap.
-
-## 1.11.5
-
-- Replace diamond control nodes with compact 80×40 rectangles and a subtle theme-aware amber background. Preserve double-side function frames and plain single-frame operations.
-- Mark functions, function values and calls with a small slanted function icon beside the name.
-
-## 1.11.4
-
-- Distinguish GIR node families with shape and restrained theme colors: rounded double-side function nodes, single-frame operations, and diamond branch/merge/gate nodes. Keep values neutral and preserve compact boundaries, handles and debugger state cues.
-- Verify node styling and existing graph interactions in light and dark themes.
-
-## 1.11.3
-
-- Clarify pipeline command names: Run with Passes / Debug GIR Passes, with matching localized menu, command-palette, input and session titles. Verify the actual editor submenu in Chinese and English.
-
-## 1.11.2
-
-- Replace pause-point checkboxes with a keyboard-only pass-name input. Default to the first pass and pause before it executes; Next pass then advances manually. Repeated names target their first occurrence.
-
-## 1.11.1
-
-- Replace the editor Run label with an icon and add a pipeline menu for composed CLI runs and interactive GIR inspection without editing launch.json.
-- Accept ordered pass sequences or pasted Camel commands, choose pause points by pass occurrence, and remember inputs per workspace in English and Simplified Chinese.
+- Add Run with Passes and Debug GIR Passes beside the editor Run icon and in the command palette. Accept ordered pass sequences or pasted Camel commands without editing launch.json; remember the pipeline per workspace.
+- Start pass inspection with a keyboard-only pause-before-pass field, defaulting to the first pass. Advance manually with Next pass; repeated names target their first occurrence.
+- Distinguish function nodes with a slanted function icon and double-side frames, and operations with a lightly rounded single frame. Grow function cards with their names while reserving matching layout space.
+- Render BRCH/JOIN as unfilled square diamonds at the normal font size. Keep GATE/SYNC as compact, tinted single-line markers without repeating their kind.
+- Hide unused DATA input handles while preserving real and projected connections in hierarchy views.
+- Color literal DATA values with the active theme's Camel lexical scopes and user TextMate overrides. Highlight literal containers conservatively and leave opaque values and function metadata unchanged.
+- Align English and Chinese command names and verify native pass debugging, graph interactions, theme changes and live color overrides in real VS Code windows.
 
 ## 1.11.0
 
