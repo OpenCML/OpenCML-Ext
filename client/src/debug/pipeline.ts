@@ -1,9 +1,9 @@
 import * as vscode from 'vscode'
 import * as path from 'path'
 import { t } from '../localization'
-import { parsePipelineInput } from './pipelineInput'
+import { parsePipelineInput, pauseBeforePass } from './pipelineInput'
 
-interface SavedPipeline { input: string; pauses: number[] }
+interface SavedPipeline { input: string }
 
 /** Native quick inputs keep the common run command immediate and configuration reviewable. */
 export async function launchPipeline(context: vscode.ExtensionContext, inspect: boolean,
@@ -38,28 +38,21 @@ export async function launchPipeline(context: vscode.ExtensionContext, inspect: 
     catch { void vscode.window.showErrorMessage(t('CML file not found: {0}', program)); return }
     if (!inspect && run) {
         const result = await run(program, parsed.passes)
-        if (result !== undefined) await context.workspaceState.update(key, { input, pauses: [] })
+        if (result !== undefined) await context.workspaceState.update(key, { input })
         return result
     }
-    let pauses: number[] = []
+    let pauseIndex = 0
     if (inspect) {
-        const sameSequence = saved && JSON.stringify(parsePipelineInput(saved.input).passes) === JSON.stringify(parsed.passes)
-        const defaultPauses = sameSequence ? saved.pauses : [1]
-        const choices = [
-            { label: t('Before all passes'), description: t('Initial GIR'), index: 0, picked: defaultPauses.includes(0) },
-            ...parsed.passes.map((pass, index) => ({
-                label: t('After {0}: {1}', index + 1, pass),
-                description: /^(std::)?(?:nvm|fvm|jit|prl)$/.test(pass) ? t('Execution pass; may consume the graph') : '',
-                index: index + 1, picked: defaultPauses.includes(index + 1)
-            }))
-        ]
-        const selected = await vscode.window.showQuickPick(choices, {
-            title: t('Choose where to pause'), canPickMany: true, ignoreFocusOut: true,
-            placeHolder: t('Select results to pause after (multi-select).')
+        const before = await vscode.window.showInputBox({
+            title: t('Pause before pass'), value: parsed.passes[0], ignoreFocusOut: true,
+            prompt: t('Pause before this pass executes; use Next pass afterwards. Repeated names select the first occurrence.'),
+            validateInput: value => {
+                try { pauseBeforePass(parsed.passes, value); return undefined }
+                catch { return t('Enter a pass name from this pipeline: {0}', parsed.passes.join(' ')) }
+            }
         })
-        if (!selected) return
-        pauses = selected.map(item => item.index)
-        if (!pauses.length) { void vscode.window.showInformationMessage(t('Select at least one pause point to inspect GIR.')); return }
+        if (before === undefined) return
+        pauseIndex = pauseBeforePass(parsed.passes, before)
     }
     const document = await vscode.workspace.openTextDocument(uri)
     const targetFolder = vscode.workspace.getWorkspaceFolder(uri)
@@ -70,10 +63,10 @@ export async function launchPipeline(context: vscode.ExtensionContext, inspect: 
     if (dirty.some(doc => doc.isDirty)) return
     const started = await vscode.debug.startDebugging(vscode.workspace.getWorkspaceFolder(uri) ?? folder, {
         type: 'camel', request: 'launch', name: inspect ? t('Inspect a pass pipeline') : t('Run a pass pipeline'),
-        program, passes: parsed.passes, passBreakpoints: pauses,
+        program, passes: parsed.passes, passBreakpoints: [pauseIndex],
         stopOnEntry: false, stepBy: 'line', frames: 'functions',
         cwd: (vscode.workspace.getWorkspaceFolder(uri) ?? folder)?.uri.fsPath ?? path.dirname(program)
     })
-    if (started) await context.workspaceState.update(key, { input, pauses })
+    if (started) await context.workspaceState.update(key, { input })
     return started
 }

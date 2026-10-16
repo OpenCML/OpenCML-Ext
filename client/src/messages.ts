@@ -284,10 +284,7 @@ export const zh: Record<string, string> = {
     "Use space-separated pass names (for example std::macro std::nvm) and close any file-path quotes.": "请用空格分隔 pass 名称（如 std::macro std::nvm），并确保文件路径的引号成对。",
     "Open a saved CML file, or include its path in the Camel command.": "请打开已保存的 CML 文件，或在 Camel 命令中包含文件路径。",
     "CML file not found: {0}": "找不到 CML 文件：{0}",
-    "Before all passes": "所有遍之前",
-    "After {0}: {1}": "第 {0} 遍后：{1}",
-    "Execution pass; may consume the graph": "执行遍，可能消费图",
-    "Choose where to pause": "选择暂停位置",
-    "Select results to pause after (multi-select).": "勾选要暂停查看的遍结果（可多选）。",
-    "Select at least one pause point to inspect GIR.": "请至少选择一个暂停位置来查看 GIR。",
+    "Pause before pass": "在指定遍之前暂停",
+    "Pause before this pass executes; use Next pass afterwards. Repeated names select the first occurrence.": "在此遍执行前暂停，之后用“下一遍”推进。同名遍取第一次出现的位置。",
+    "Enter a pass name from this pipeline: {0}": "请输入此流水线中的遍名：{0}",
 }

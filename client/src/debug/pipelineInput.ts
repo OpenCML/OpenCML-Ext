@@ -21,3 +21,10 @@ export function parsePipelineInput(input: string): { program?: string; passes: s
     if (!words.length || words.some(pass => !/^[A-Za-z_][\w]*(?:::[A-Za-z_][\w]*)*$/.test(pass))) throw new Error('passes')
     return { program, passes: words }
 }
+
+/** Snapshot N is the input of pass N (zero-based), before that pass executes. */
+export function pauseBeforePass(passes: string[], name: string): number {
+    const index = passes.indexOf(name.trim())
+    if (index < 0) throw new Error('unknown pass')
+    return index
+}

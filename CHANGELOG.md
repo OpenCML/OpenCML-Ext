@@ -1,3 +1,7 @@
+## 1.11.2
+
+- Replace pause-point checkboxes with a keyboard-only pass-name input. Default to the first pass and pause before it executes; Next pass then advances manually. Repeated names target their first occurrence.
+
 ## 1.11.1
 
 - Replace the editor Run label with an icon and add a pipeline menu for composed CLI runs and interactive GIR inspection without editing launch.json.

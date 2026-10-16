@@ -236,18 +236,20 @@ Use **Source GIR** to leave session inspection. The selected VS Code session con
 
 For a launch without editing JSON, use the arrow beside the editor's Run icon:
 **Run Pass Pipeline…** executes a space-separated pass sequence in the Camel output channel;
-**Inspect Pass Pipeline…** additionally lets you select the results at which to pause.
+**Inspect Pass Pipeline…** asks which pass to pause before, prefilled with the first pass.
 Enter `std::macro std::inline std::nvm`, or paste `camel "path/to/file.cml" std::macro std::nvm`.
-Pause choices show each occurrence in execution order, including repeated passes. Continue
-runs to the next selected result; Next pass advances one pass. Execution/export passes may
-consume the graph and cannot provide an after-pass GIR. The inputs and selected pause points
-are remembered per workspace. These commands do not create or modify `launch.json`.
+Press Enter to accept the first pass, or type another pass name. Repeated names select the
+first occurrence. The initial stop shows the graph before that pass executes; Next pass
+executes it and displays its result. Execution/export passes may consume the graph and
+cannot provide an after-pass GIR. The pipeline input is remembered per workspace; the
+pause field always defaults to its first pass. These commands do not modify `launch.json`.
 
 无需编写 JSON：点击编辑器运行图标旁的下拉箭头，选择 **组合运行…** 或 **组合查看 GIR…**。
 输入按顺序排列的 pass（例如 `std::macro std::inline std::nvm`），也可以粘贴
 `camel "文件.cml" std::macro std::nvm`。组合运行在 Camel 输出窗口执行；组合查看 GIR
-会让你勾选在哪一遍后暂停，默认选中第一遍后。按“继续”前往下一个选中位置，按“下一遍”
-推进一遍。输入和暂停位置会按工作区记忆，不会修改 `launch.json`。消费图的执行/导出遍没有后续 GIR。
+只需输入在哪个遍之前暂停，默认填入本次流水线的第一个遍，直接回车即可。
+之后按“下一遍”执行该遍并查看结果。同名遍取第一次出现的位置。流水线输入按工作区记忆，
+暂停遍每次默认取第一个，不会修改 `launch.json`。消费图的执行/导出遍没有后续 GIR。
 
 
 Use **Camel: Inspect Debug Memory** from the command palette or the memory icon in a paused GIR

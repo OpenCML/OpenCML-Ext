@@ -44,16 +44,13 @@ func main(): int sync {
             await input.waitFor({ state: 'visible' })
             await input.fill(`camel "${program}" std::macro std::inline std::nvm`)
             await input.press('Enter')
-            await new Promise(r => setTimeout(r, 500))
-            await page.screenshot({ path: path.join(workspace.uri.fsPath, 'pipeline-input-accepted.png') })
-            const initial = page.locator('.quick-input-widget').getByText(label('Before all passes'), { exact: true })
-            await initial.waitFor({ state: 'visible' })
-            await initial.click()
-            await page.screenshot({ path: path.join(workspace.uri.fsPath, 'pipeline-pause-picker.png') })
+            await page.locator('.quick-input-widget').getByText(label('Pause before pass'), { exact: true }).waitFor()
+            assert.equal(await input.inputValue(), 'std::macro', 'pause input must default to the first pass')
+            await page.screenshot({ path: path.join(workspace.uri.fsPath, 'pipeline-pause-input.png') })
             await input.press('Enter')
             assert(await launch)
             assert(!fs.existsSync(path.join(workspace.uri.fsPath, '.vscode/launch.json')))
-            console.log('PIPELINE_COMPOSE_OK: pasted command, native pause selection and launch without launch.json')
+            console.log('PIPELINE_COMPOSE_OK: pasted command, keyboard-only pause-before input and launch without launch.json')
         } else assert(await vscode.debug.startDebugging(undefined, {
             type: 'camel', request: 'launch', name: 'Pipeline UI', program,
             passes: ['std::macro', 'std::inline', 'std::nvm'], stopOnPassEntry: true
@@ -130,6 +127,27 @@ func main(): int sync {
         assert.equal(stops.at(-1).pipeline?.index, 0, 'restart did not return to initial compiler boundary')
         session = vscode.debug.activeDebugSession
         await frame.getByText(label('Before compiler passes'), { exact: true }).waitFor()
+        if (process.env.E2E_COMPOSE_PIPELINE) {
+            await vscode.debug.stopDebugging(session)
+            await vscode.window.showTextDocument(doc)
+            const page = frame.page()
+            const input = page.locator('.quick-input-widget input[type="text"]')
+            const sessionCount = sessions.length
+            const launch = vscode.commands.executeCommand('camel.inspectPipeline')
+            await input.waitFor({ state: 'visible' })
+            await input.press('Enter')
+            await page.locator('.quick-input-widget').getByText(label('Pause before pass'), { exact: true }).waitFor()
+            assert.equal(await input.inputValue(), 'std::macro')
+            await input.fill('std::inline')
+            await input.press('Enter')
+            assert(await launch)
+            for (let i = 0; i < 100 && sessions.length === sessionCount; i++) await new Promise(r => setTimeout(r, 100))
+            session = sessions.at(-1)
+            assert.deepEqual(session.configuration.passBreakpoints, [1])
+            for (let i = 0; i < 100 && stops.at(-1).pipeline?.index !== 1; i++) await new Promise(r => setTimeout(r, 100))
+            assert.equal(stops.at(-1).pipeline?.index, 1, 'pause before inline must show the graph after macro')
+            console.log('PIPELINE_BEFORE_OK: Enter defaults to before macro; named inline pauses after macro')
+        }
         console.log('PIPELINE_UI_OK: actual macro graph, history/current separation, pass stepping, runtime handoff, multiple sessions, restart and narrow layout')
         console.log('PIPELINE_SCREENSHOTS:', workspace.uri.fsPath)
     } finally {
