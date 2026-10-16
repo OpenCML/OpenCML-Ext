@@ -2,6 +2,7 @@
 // Clusters become background box nodes (not parents), members stay absolute.
 import type { DotGraph, DotSubgraph } from './dot'
 import { loopDetails, type LoopDetails } from './loops'
+import { nodeDisplaySize } from './geometry'
 
 export interface FlowNode {
     id: string
@@ -133,10 +134,8 @@ export function buildFlowModel(dot: DotGraph, gv: GvJson, arrangement: 'original
                 s.width = 64
                 s.height = 24
             }
-            if (node.attrs.function_value === '1') { s.width = Math.max(104, s.width); s.height = 44 }
-            if (['FUNC', 'CALL'].includes(node.attrs.type)) s.width = Math.max(72, s.width)
-            if (node.attrs.type === 'LOOP') { s.width = 148; s.height = 56 }
-            if (['BRCH', 'JOIN', 'GATE'].includes(node.attrs.type)) { s.width = 80; s.height = 40 }
+            const displaySize = nodeDisplaySize(node.attrs, node.id)
+            if (displaySize) Object.assign(s, displaySize)
             nodeIds.add(key)
             nodes.push({
                 id: key,

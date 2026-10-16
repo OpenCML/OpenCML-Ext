@@ -5,6 +5,10 @@ const { parseDot } = await loadTs('webview/src/panels/graphviz/dot.ts')
 const { buildFlowModel } = await loadTs('webview/src/panels/graphviz/layout.ts')
 const { focusGraph } = await loadTs('webview/src/panels/graphviz/hierarchy.ts')
 const { loopLayoutDot, loopScope } = await loadTs('webview/src/panels/graphviz/loops.ts')
+const { nodeDisplaySize } = await loadTs('webview/src/panels/graphviz/geometry.ts')
+assert(nodeDisplaySize({ type: 'FUNC', label: 'transform_input_vector' }, '').width > nodeDisplaySize({ type: 'FUNC', label: 'run' }, '').width)
+assert.equal(nodeDisplaySize({ type: 'FUNC', label: 'a'.repeat(100) }, '').width, 220)
+assert.equal(nodeDisplaySize({ type: 'GATE' }, '').height, 26)
 
 const fixture = `digraph G {
  subgraph m { label="main";

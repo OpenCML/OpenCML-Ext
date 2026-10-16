@@ -1,3 +1,8 @@
+## 1.11.6
+
+- Give operations a small corner radius. Render GATE/BRCH/JOIN/SYNC as compact single-line 44×26 labels without repeating the kind.
+- Let function cards grow with their names, reserving icon/frame space consistently in both display and layout while retaining the existing 220px cap.
+
 ## 1.11.5
 
 - Replace diamond control nodes with compact 80×40 rectangles and a subtle theme-aware amber background. Preserve double-side function frames and plain single-frame operations.

@@ -29,7 +29,8 @@ never infer function identity from a display string. Layout uses the compact car
 Node families use redundant visual cues without adding graph labels: rounded double-side
 function references/calls, plain single-frame operations, and compact control rectangles
 with a subtle amber background. Function nodes also carry a small slanted function icon.
-Avoid diamonds and oversized control geometry. LOOP keeps
+Avoid diamonds and oversized control geometry. GATE/BRCH/JOIN/SYNC are single-line 44×26
+markers, showing the kind once with no duplicated subtitle or dot. LOOP keeps
 a compact rectangle for its navigation controls. Plain values stay neutral. Derive families from runtime kinds and function metadata;
 retain node dimensions, visible edge handles, loop actions and distinct debugger state cues.
 

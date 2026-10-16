@@ -1,4 +1,5 @@
 import { t } from '../../../../client/src/localization'
+import { nodeDisplaySize } from './geometry'
 import type { FlowModel, FlowNode } from './layout'
 import type { DotGraph, DotSubgraph } from './dot'
 
@@ -60,9 +61,8 @@ export function loopLayoutDot(raw: string, dot: DotGraph): string {
     const overrides: string[] = []
     const walk = (sub: DotSubgraph) => {
         for (const node of sub.nodes) {
-            if (node.attrs.type === 'LOOP') overrides.push(`${JSON.stringify(node.id)} [label="", fixedsize=true, width=${148 / 72}, height=${56 / 72}];`)
-            if (['FUNC', 'CALL'].includes(node.attrs.type)) overrides.push(`${JSON.stringify(node.id)} [fixedsize=false, width=1];`)
-            if (['BRCH', 'JOIN', 'GATE'].includes(node.attrs.type)) overrides.push(`${JSON.stringify(node.id)} [label="", shape=box, fixedsize=true, width=${80 / 72}, height=${40 / 72}];`)
+            const size = nodeDisplaySize(node.attrs, node.id)
+            if (size) overrides.push(`${JSON.stringify(node.id)} [label="", shape=box, fixedsize=true, width=${size.width / 72}, height=${size.height / 72}];`)
         }
         sub.subgraphs.forEach(walk)
     }

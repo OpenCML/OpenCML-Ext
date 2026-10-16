@@ -25,6 +25,7 @@ const props = defineProps<{
 }>()
 const functionValue = computed(() => props.data.attrs.function_value === '1')
 const boundary = computed(() => ['ARGS', 'EXIT'].includes(props.data.nodeType))
+const compactControl = computed(() => ['BRCH', 'JOIN', 'GATE', 'SYNC'].includes(props.data.nodeType))
 // Use runtime kinds and explicit function-value metadata, never label text.
 const family = computed(() => boundary.value ? 'boundary'
     : functionValue.value || ['FUNC', 'CALL'].includes(props.data.nodeType) ? 'function'
@@ -54,7 +55,7 @@ const nodeTitle = computed(() => {
         :class="[
             `t-${data.nodeType.toLowerCase()}`,
             `family-${family}`,
-            { selected, boundary, 'function-value': functionValue, breakpoint: !boundary && data.breakpoint, paused: !boundary && data.paused }
+            { selected, boundary, 'compact-control': compactControl, 'function-value': functionValue, breakpoint: !boundary && data.breakpoint, paused: !boundary && data.paused }
         ]"
         :style="{ width: `${data.width}px`, height: `${data.height}px` }"
     >
@@ -65,6 +66,7 @@ const nodeTitle = computed(() => {
                 <button type="button" :disabled="!data.loop.body?.scope" :title="data.loop.body?.scope ? data.loop.body.name : t('Subgraph unavailable or ambiguous')" :aria-label="t('Enter loop body')" @dblclick.stop @click.stop="data.loop.body?.scope && openSubgraph?.(data.loop.body.scope)">{{ t('Loop body') }}<PanelIcon name="chevron" :size="10" /></button>
             </div>
         </template>
+        <div v-else-if="compactControl" class="gir-label">{{ data.nodeType }}</div>
         <template v-else>
             <div class="gir-label" :title="nodeTitle"><PanelIcon v-if="family === 'function'" name="function" class="function-symbol" :size="12" />{{ boundary ? (data.nodeType === 'ARGS' ? t("Input") : t("Output")) : data.label }}</div>
             <div v-if="!boundary" class="gir-type">{{ functionValue ? t("Function value") : data.nodeType }}<span v-if="data.enterScope" :aria-label='t("Open subgraph")'>↗</span></div>
@@ -94,10 +96,9 @@ const nodeTitle = computed(() => {
 .function-symbol { color: var(--node-accent); margin-right: 5px; vertical-align: -2px; }
 .family-function { --node-accent: var(--vscode-charts-purple, #b180d7); --node-line: color-mix(in srgb, var(--node-accent) 55%, var(--node-base-line)); --node-fill: color-mix(in srgb, var(--node-accent) 4%, var(--gir-bg)); border-radius: 9px; padding-inline: 12px; }
 .family-function::after { content: ''; position: absolute; inset: 5px; border-inline: 1px solid color-mix(in srgb, var(--node-accent) 50%, transparent); border-radius: 4px; pointer-events: none; }
-.family-operation { --node-accent: var(--vscode-charts-blue, #3794ff); border-radius: 2px; }
+.family-operation { --node-accent: var(--vscode-charts-blue, #3794ff); border-radius: 4px; }
 .family-operation .gir-type::before { border-radius: 0; }
-.family-control { --node-accent: var(--vscode-charts-orange, #d18616); --node-line: color-mix(in srgb, var(--node-accent) 40%, var(--node-base-line)); --node-fill: color-mix(in srgb, var(--node-accent) 10%, var(--gir-bg)); border-radius: 4px; box-shadow: none; }
-.family-control .gir-type::before { width: 6px; height: 3px; border-radius: 1px; }
+.family-control { --node-accent: var(--vscode-charts-orange, #d18616); --node-line: color-mix(in srgb, var(--node-accent) 40%, var(--node-base-line)); --node-fill: color-mix(in srgb, var(--node-accent) 10%, var(--gir-bg)); border-radius: 4px; padding: 2px 6px; box-shadow: none; }
 .function-value .gir-type { letter-spacing: 0; }
 .t-loop { padding: 7px 8px 5px; gap: 0; box-shadow: none; }
 .loop-heading { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; }
