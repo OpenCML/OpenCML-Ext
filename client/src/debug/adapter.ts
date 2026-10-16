@@ -1,5 +1,6 @@
 import * as vscode from 'vscode'
 import { t } from '../localization'
+import { callState, type CallState } from './callState'
 
 /** One native DAP adapter per VS Code session. The plugin observes events for GIR only;
  * breakpoints, stack, values, stepping and lifecycle belong to camel-db. */
@@ -7,6 +8,7 @@ export interface DebugViewState {
     status: 'running' | 'paused' | 'ended'
     allocation?: { phase: string; space: string; size: number }
     pipeline?: { index: number; pass: string | null; boundary: 'initial' | 'after' }
+    call?: CallState
 }
 export class CamelDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory {
     onDidChangePausedNode: ((session: vscode.DebugSession, origin: number | null) => void) | null = null
@@ -14,6 +16,7 @@ export class CamelDebugAdapterFactory implements vscode.DebugAdapterDescriptorFa
     onDidStop: ((session: vscode.DebugSession, state: DebugViewState) => void) | null = null
     onDidChangeState: ((session: vscode.DebugSession, state: DebugViewState) => void) | null = null
     private readonly states = new Map<string, DebugViewState>()
+    private readonly calls = new Map<string, CallState>()
     private origins: number[] = []
 
     constructor(context: vscode.ExtensionContext) {
@@ -30,13 +33,17 @@ export class CamelDebugAdapterFactory implements vscode.DebugAdapterDescriptorFa
                 onDidSendMessage: message => {
                     if (message.type !== 'event') return
                     if (message.event === 'initialized') {
+                        this.calls.delete(session.id)
                         // This event follows compilation and precedes configurationDone.
                         void this.sendBreakpoints(session)
                         this.onDidRefreshGirIndex?.(session)
                     } else if (message.event === 'camel/stopped') {
                         const origin = Number(message.body?.frame?.node?.origin ?? 0)
                         this.onDidChangePausedNode?.(session, origin > 0 ? origin : null)
-                        const state: DebugViewState = { status: 'paused', pipeline: message.body?.pipeline, allocation: message.body?.allocation }
+                        const call = callState(message.body?.frame, this.calls.get(session.id))
+                        if (call) this.calls.set(session.id, call)
+                        else this.calls.delete(session.id)
+                        const state: DebugViewState = { status: 'paused', pipeline: message.body?.pipeline, allocation: message.body?.allocation, call }
                         this.states.set(session.id, state)
                         this.onDidChangeState?.(session, state)
                         this.onDidStop?.(session, state)
@@ -45,7 +52,7 @@ export class CamelDebugAdapterFactory implements vscode.DebugAdapterDescriptorFa
                         const state: DebugViewState = { status: message.event === 'terminated' ? 'ended' : 'running' }
                         this.states.set(session.id, state)
                         this.onDidChangeState?.(session, state)
-                        if (state.status === 'ended') this.states.delete(session.id)
+                        if (state.status === 'ended') { this.states.delete(session.id); this.calls.delete(session.id) }
                     }
                 }
             })

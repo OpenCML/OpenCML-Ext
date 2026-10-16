@@ -594,7 +594,7 @@ export function activate(context: vscode.ExtensionContext) {
     debugFactory.onDidStop = (session, stopped) => {
         if (session.id !== debugFactory?.currentSession()?.id) return
         void renderDebugSession(context, undefined, !memoryInspector.active).then(() => {
-            if (session.id === debugFactory?.currentSession()?.id && girState) {
+            if (session.id === debugFactory?.currentSession()?.id && debugFactory.currentState() === stopped && girState) {
                 girState.debugView = { command: 'debugState', sessionId: session.id, name: session.name, state: stopped }
                 girState.panel.webview.postMessage(girState.debugView)
             }

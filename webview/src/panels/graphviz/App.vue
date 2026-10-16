@@ -13,6 +13,7 @@ import { loopLayoutDot, loopScope, loopLabel, stateLabel } from './loops'
 import GirNode from './components/GirNode.vue'
 import GirCluster from './components/GirCluster.vue'
 import PanelIcon from './components/PanelIcon.vue'
+import type { CallState } from '../../../../client/src/debug/callState'
 
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void; getState(): { view?: string; arrangement?: string; browsing?: string } | undefined; setState(state: unknown): void }
 const vscode = acquireVsCodeApi()
@@ -307,6 +308,7 @@ const snapshotError = ref('')
 const snapshotSel = ref<number | null>(null)
 const debugStatus = ref<'running' | 'paused' | 'ended' | null>(null)
 const debugSessionName = ref('')
+const debugCall = ref<CallState | null>(null)
 const pipelineStage = ref<{ index: number; pass: string | null; boundary: string } | null>(null)
 const executionLabel = computed(() => debugStatus.value === 'running' ? t('Running') : debugStatus.value === 'ended' ? t('Session ended') : pipelineStage.value ? (pipelineStage.value.pass ? t('After {0}', pipelineStage.value.pass) : t('Before compiler passes')) : t('Runtime paused'))
 function debugAction(command: string) { vscode.postMessage({ command }) }
@@ -613,6 +615,7 @@ function onMessage(event: MessageEvent) {
     } else if (message.command === 'debugState') {
         debugStatus.value = message.state?.status ?? null
         debugSessionName.value = message.name ?? ''
+        debugCall.value = message.state?.call ?? null
         pipelineStage.value = message.state?.pipeline ?? null
         if (!message.state) snapshots.value = []
     } else if (message.command === 'passGraphs') {
@@ -706,6 +709,19 @@ onUnmounted(() => {
             <button :disabled="debugStatus !== 'paused'" @click="debugAction('debugContinue')">{{ t('Continue') }}</button>
             <button :aria-label="t('Memory')" :title="t('Memory')" @click="debugAction('debugMemory')"><PanelIcon name="memory" :size="14" /></button>
             <button class="debug-source" :aria-label="t('Source GIR')" :title="t('Source GIR')" @click="debugAction('debugSource')"><PanelIcon name="file" :size="14" /></button>
+        </section>
+        <section v-if="debugStatus === 'paused' && debugCall && snapshotSel === null" class="debug-call" :aria-label="t('Function arguments')">
+            <div class="debug-call-heading">
+                <span>{{ debugCall.entry ? t('Entered {0}', debugCall.name) : debugCall.name }}</span>
+                <span v-if="debugCall.tailReplaced" class="debug-call-note">{{ t('Tail call · {0}', debugCall.tailReplaced) }}</span>
+                <span class="debug-call-note">{{ t('Paused before execution') }}</span>
+            </div>
+            <dl v-if="debugCall.arguments.length" class="debug-arguments">
+                <div v-for="arg in debugCall.arguments" :key="arg.name" :class="{ changed: arg.previous !== undefined }" :title="`${arg.name}: ${arg.type}`">
+                    <dt>{{ arg.name }}</dt>
+                    <dd><span v-if="arg.previous !== undefined" class="previous-value">{{ arg.previous }} → </span><span>{{ arg.value }}</span></dd>
+                </div>
+            </dl>
         </section>
         <nav v-if="view === 'graph' && browsing === 'hierarchy'" class="hierarchy-bar" :aria-label='t("Graph navigation")'>
 
@@ -871,6 +887,15 @@ h1 { margin: 0; font-size: 13px; font-weight: 650; letter-spacing: .04em; }
 .debug-strip select { min-width: 0; max-width: 30ch; }
 .debug-strip button:disabled { opacity: .5; cursor: default; }
 .debug-strip .debug-source { margin-left: auto; border-color: transparent; color: var(--gir-muted); }
+.debug-call { padding: 7px 12px; border-bottom: 1px solid var(--gir-line); background: var(--gir-surface); font-size: 12px; }
+.debug-call-heading { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; font-weight: 600; }
+.debug-call-note { color: var(--gir-muted); font-weight: 400; font-size: 11px; }
+.debug-arguments { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 6px 0 0; font-family: var(--vscode-editor-font-family, monospace); }
+.debug-arguments > div { display: flex; gap: 6px; min-width: 0; max-width: 100%; align-items: baseline; }
+.debug-arguments dt { color: var(--gir-muted); }
+.debug-arguments dd { margin: 0; overflow-wrap: anywhere; min-width: 0; }
+.debug-arguments .changed dd > span:last-child { font-weight: 700; color: var(--vscode-debugTokenExpression-valueChanged, var(--gir-fg)); }
+.previous-value { color: var(--gir-muted); }
 .options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; padding: 14px 16px; background: var(--gir-surface); border-bottom: 1px solid var(--gir-line); flex-shrink: 0; }
 .option-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; color: var(--gir-muted); font-size: 11px; }
 .option-field select { width: 100%; min-height: 28px; border: 1px solid var(--gir-line); border-radius: 4px; background: var(--vscode-dropdown-background, var(--gir-bg)); color: var(--gir-fg); padding: 0 6px; }

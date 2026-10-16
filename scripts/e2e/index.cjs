@@ -75,6 +75,11 @@ function run(testsRoot, callback) {
             return
         }
 
+        if (mode === 'recursion') {
+            await require('./recursion.cjs').run(vscode, workspaceFolder)
+            return
+        }
+
         if (mode === 'experience') {
             await require('./experience.cjs').run(vscode, workspaceFolder)
             return

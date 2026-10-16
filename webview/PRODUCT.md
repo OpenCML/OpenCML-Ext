@@ -18,6 +18,10 @@ Debug session graphs come from native DAP and the stopped worker, never from rec
 editor. A compact strip identifies the actual initial/after-pass/runtime stop, offers explicit
 pass stepping, and separates inspected history from execution position. Standard source
 stepping cannot silently mean a compiler step. Preserve theme tokens and wrap at narrow widths.
+At runtime stops, show the function and its argument snapshot in a separate compact row.
+Identify entry and tail calls explicitly; compare arguments only across activations of the
+same function in the same session. Keep old → new values visible throughout the new activation,
+without animation, and hide live argument context while inspecting a compiler snapshot.
 
 Hierarchy opens a uniquely referenced module-entry main directly, with a route back to the
 module. Preserve explicit navigation choices; a library graph merely named main is not an entry.

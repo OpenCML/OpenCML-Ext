@@ -1,3 +1,7 @@
+## 1.12.3
+
+- Show current function arguments at runtime stops, with entry/tail-call context and old → new values across recursive activations. Requires an updated Camel debugger; F10 skips tail-call chains and F11 enters the next activation.
+
 ## 1.12.2
 
 - Use `std::macro std::opt std::nvm` as the default pass pipeline in quick inputs and launch templates. Preserve previously saved user pipelines.

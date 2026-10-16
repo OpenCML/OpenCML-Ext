@@ -33,6 +33,7 @@ jobs:
           node scripts/gir-json-test.mjs
           node scripts/gir-literal-test.mjs
           node scripts/pipeline-input-test.mjs
+          node scripts/debug-call-test.mjs
           npx tsc --noEmit --skipLibCheck --esModuleInterop --target es2020 --module commonjs client/src/extension.ts server/src/server.ts
       - run: npm run build
       - name: Check tag version
