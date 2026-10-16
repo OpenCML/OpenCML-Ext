@@ -25,12 +25,40 @@ func main(): int sync {
     try {
         const doc = await vscode.workspace.openTextDocument(program)
         await vscode.window.showTextDocument(doc)
-        assert(await vscode.debug.startDebugging(undefined, {
+        browser = await chromium.connectOverCDP(`http://127.0.0.1:${process.env.E2E_CDP_PORT || 19338}`)
+        if (process.env.E2E_COMPOSE_PIPELINE) {
+            const page = browser.contexts().flatMap(c => c.pages())[0]
+            const input = page.locator('.quick-input-widget input[type="text"]')
+            const runInput = `camel "${program}" std::macro std::nvm`
+            const run = vscode.commands.executeCommand('camel.runPipeline')
+            await input.waitFor({ state: 'visible' })
+            await input.fill(runInput)
+            await input.press('Enter')
+            assert.equal(await run, 0, 'composed CLI run failed')
+            const cancelledRun = vscode.commands.executeCommand('camel.runPipeline')
+            await input.waitFor({ state: 'visible' })
+            assert.equal(await input.inputValue(), runInput, 'run sequence was not remembered')
+            await input.press('Escape')
+            assert.equal(await cancelledRun, undefined)
+            const launch = vscode.commands.executeCommand('camel.inspectPipeline')
+            await input.waitFor({ state: 'visible' })
+            await input.fill(`camel "${program}" std::macro std::inline std::nvm`)
+            await input.press('Enter')
+            await new Promise(r => setTimeout(r, 500))
+            await page.screenshot({ path: path.join(workspace.uri.fsPath, 'pipeline-input-accepted.png') })
+            const initial = page.locator('.quick-input-widget').getByText(label('Before all passes'), { exact: true })
+            await initial.waitFor({ state: 'visible' })
+            await initial.click()
+            await page.screenshot({ path: path.join(workspace.uri.fsPath, 'pipeline-pause-picker.png') })
+            await input.press('Enter')
+            assert(await launch)
+            assert(!fs.existsSync(path.join(workspace.uri.fsPath, '.vscode/launch.json')))
+            console.log('PIPELINE_COMPOSE_OK: pasted command, native pause selection and launch without launch.json')
+        } else assert(await vscode.debug.startDebugging(undefined, {
             type: 'camel', request: 'launch', name: 'Pipeline UI', program,
             passes: ['std::macro', 'std::inline', 'std::nvm'], stopOnPassEntry: true
         }))
         session = vscode.debug.activeDebugSession
-        browser = await chromium.connectOverCDP(`http://127.0.0.1:${process.env.E2E_CDP_PORT || 19338}`)
         let frame
         for (let i = 0; i < 100 && !frame; i++) {
             for (const page of browser.contexts().flatMap(c => c.pages())) {

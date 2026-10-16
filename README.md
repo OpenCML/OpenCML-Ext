@@ -234,6 +234,21 @@ The session strip separates the current execution position from the inspected sn
 selecting history does not run anything, and **Return to current stop** restores the live view.
 Use **Source GIR** to leave session inspection. The selected VS Code session controls the panel.
 
+For a launch without editing JSON, use the arrow beside the editor's Run icon:
+**Run Pass Pipeline…** executes a space-separated pass sequence in the Camel output channel;
+**Inspect Pass Pipeline…** additionally lets you select the results at which to pause.
+Enter `std::macro std::inline std::nvm`, or paste `camel "path/to/file.cml" std::macro std::nvm`.
+Pause choices show each occurrence in execution order, including repeated passes. Continue
+runs to the next selected result; Next pass advances one pass. Execution/export passes may
+consume the graph and cannot provide an after-pass GIR. The inputs and selected pause points
+are remembered per workspace. These commands do not create or modify `launch.json`.
+
+无需编写 JSON：点击编辑器运行图标旁的下拉箭头，选择 **组合运行…** 或 **组合查看 GIR…**。
+输入按顺序排列的 pass（例如 `std::macro std::inline std::nvm`），也可以粘贴
+`camel "文件.cml" std::macro std::nvm`。组合运行在 Camel 输出窗口执行；组合查看 GIR
+会让你勾选在哪一遍后暂停，默认选中第一遍后。按“继续”前往下一个选中位置，按“下一遍”
+推进一遍。输入和暂停位置会按工作区记忆，不会修改 `launch.json`。消费图的执行/导出遍没有后续 GIR。
+
 
 Use **Camel: Inspect Debug Memory** from the command palette or the memory icon in a paused GIR
 session to inspect region usage and paged bytes/objects. The view uses the selected debug

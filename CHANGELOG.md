@@ -1,3 +1,8 @@
+## Unreleased
+
+- Replace the editor Run label with an icon and add a pipeline menu for composed CLI runs and interactive GIR inspection without editing launch.json.
+- Accept ordered pass sequences or pasted Camel commands, choose pause points by pass occurrence, and remember inputs per workspace in English and Simplified Chinese.
+
 ## 1.11.0
 
 - Use the native Camel DAP debugger for compiler-pass and runtime debugging. Configure pass breakpoints, step through passes, and inspect the paused GIR with snapshot history and multi-session navigation.

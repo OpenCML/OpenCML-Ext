@@ -60,5 +60,8 @@
     "contributes.debuggers.0.configurationAttributes.launch.properties.frames.description": "显示函数调用帧或所有内部子图帧。",
     "contributes.debuggers.0.configurationAttributes.launch.properties.stopOnPassEntry.description": "在任何编译遍执行前的初始 GIR 处暂停。",
     "contributes.debuggers.0.configurationAttributes.launch.properties.passBreakpoints.description": "在 GIR 快照序号处暂停：0 为初始图，N 为第 N 个返回图的 pass 执行后。",
-    "camel.showMemory.title": "查看调试内存"
+    "camel.showMemory.title": "查看调试内存",
+    "camel.runPipeline.title": "组合运行…",
+    "camel.inspectPipeline.title": "组合查看 GIR…",
+    "camel.pipelineMenu.title": "组合运行与 GIR"
 }

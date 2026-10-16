@@ -213,6 +213,11 @@
                     "group": "navigation"
                 },
                 {
+                    "submenu": "camel.pipelineMenu",
+                    "when": "editorLangId == cml",
+                    "group": "navigation@1"
+                },
+                {
                     "command": "camel.vizGIR",
                     "when": "editorLangId == cml",
                     "group": "navigation@2"
@@ -234,6 +239,16 @@
                     "when": "editorLangId == cml",
                     "group": "navigation@90"
                 }
+            ],
+            "camel.pipelineMenu": [
+                {
+                    "command": "camel.runPipeline",
+                    "group": "1_pipeline"
+                },
+                {
+                    "command": "camel.inspectPipeline",
+                    "group": "1_pipeline"
+                }
             ]
         },
         "commands": [
@@ -245,7 +260,8 @@
             },
             {
                 "command": "camel.run",
-                "title": "%contributes.commands.1.title%"
+                "title": "%contributes.commands.1.title%",
+                "icon": "$(play)"
             },
             {
                 "command": "camel.format",
@@ -264,6 +280,16 @@
             {
                 "command": "camel.showMemory",
                 "title": "%camel.showMemory.title%",
+                "category": "Camel"
+            },
+            {
+                "command": "camel.runPipeline",
+                "title": "%camel.runPipeline.title%",
+                "category": "Camel"
+            },
+            {
+                "command": "camel.inspectPipeline",
+                "title": "%camel.inspectPipeline.title%",
                 "category": "Camel"
             }
         ],
@@ -474,6 +500,13 @@
                 "key": "ctrl+k ctrl+g",
                 "mac": "cmd+k cmd+g",
                 "when": "editorLangId == cml && editorTextFocus"
+            }
+        ],
+        "submenus": [
+            {
+                "id": "camel.pipelineMenu",
+                "label": "%camel.pipelineMenu.title%",
+                "icon": "$(chevron-down)"
             }
         ]
     },

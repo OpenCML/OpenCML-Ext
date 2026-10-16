@@ -18,6 +18,7 @@ import { presentDiagnostics, registerDiagnosticAdvice } from './diagnosticAdvice
 import { RuntimeStatus, inspectRuntime } from './runtimeStatus'
 import { CamelDebugAdapterFactory } from './debug/adapter'
 import { MemoryInspector } from './debug/memory'
+import { launchPipeline } from './debug/pipeline'
 import { mapGirSources } from './girSource'
 import { inspectCompatibility, languageFeatures } from './compatibility'
 
@@ -67,22 +68,22 @@ function execFileAsync(
 }
 
 // Run the active file with the Camel CLI and stream output to the Camel channel.
-async function runCamel(): Promise<number | undefined> {
+async function runCamel(program?: string, passes: string[] = []): Promise<number | undefined> {
     if (runInProgress) {
         getOutputChannel().show(true)
         return
     }
     const editor = vscode.window.activeTextEditor
-    if (!editor || editor.document.languageId !== 'cml') {
+    if (!program && (!editor || editor.document.languageId !== 'cml')) {
         vscode.window.showInformationMessage(t("Open a CML file first, then run Camel."))
         return
     }
-    if (editor.document.uri.scheme !== 'file') {
+    if (!program && editor!.document.uri.scheme !== 'file') {
         void vscode.window.showInformationMessage(t("Save the file as .cml before running Camel."))
         await vscode.commands.executeCommand('workbench.action.files.save')
         return
     }
-    const document = editor.document
+    const document = program ? await vscode.workspace.openTextDocument(vscode.Uri.file(program)) : editor!.document
     const folder = vscode.workspace.getWorkspaceFolder(document.uri)
     const filePath = document.uri.fsPath
     const channel = getOutputChannel()
@@ -106,10 +107,10 @@ async function runCamel(): Promise<number | undefined> {
         const toolchain = detectToolchain(getCamelPath())
         channel.clear()
         if (dirty.length) channel.appendLine(t("Saved {0} Camel files: {1}", dirty.length, dirty.map(doc => path.basename(doc.uri.fsPath)).join(', ')))
-        channel.appendLine(`> ${toolchain.camel} ${filePath}`)
+        channel.appendLine(`> ${toolchain.camel} ${filePath}${passes.length ? ' ' + passes.join(' ') : ''}`)
         channel.show(true)
         return await new Promise<number | undefined>(resolve => {
-            const proc = child_process.spawn(toolchain.camel, [filePath], { cwd: path.dirname(filePath), windowsHide: true })
+            const proc = child_process.spawn(toolchain.camel, [filePath, ...passes], { cwd: path.dirname(filePath), windowsHide: true })
             proc.stdout.on('data', data => channel.append(data.toString()))
             proc.stderr.on('data', data => channel.append(data.toString()))
             proc.on('error', error => {
@@ -524,6 +525,10 @@ export function activate(context: vscode.ExtensionContext) {
     runtimeStatus = new RuntimeStatus()
     context.subscriptions.push(runtimeStatus)
     registerDiagnosticAdvice(context)
+    context.subscriptions.push(
+        vscode.commands.registerCommand('camel.runPipeline', () => launchPipeline(context, false, runCamel)),
+        vscode.commands.registerCommand('camel.inspectPipeline', () => launchPipeline(context, true))
+    )
 
     context.subscriptions.push(
         vscode.commands.registerCommand('camel.showPath', () => {
