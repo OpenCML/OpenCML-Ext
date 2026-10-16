@@ -26,6 +26,11 @@ Function-valued DATA nodes use explicit JSON callee references for a compact fun
 function glyph. Retain DATA semantics and the original runtime representation in inspection;
 never infer function identity from a display string. Layout uses the compact card dimensions.
 
+Node families use redundant visual cues without adding graph labels: rounded double-side
+function references/calls, plain single-frame operations, and diamond branch/merge/gate
+nodes. LOOP keeps a compact rectangle for its navigation controls. Plain values stay neutral. Derive families from runtime kinds and function metadata;
+retain node dimensions, visible edge handles, loop actions and distinct debugger state cues.
+
 The secondary memory panel follows the selected native debug session. Read an aggregate once
 on first paused open, then refresh explicitly; invalidate old heap responses on stop/session
 changes. Byte/object pages scroll within their data area, controls wrap at narrow widths.

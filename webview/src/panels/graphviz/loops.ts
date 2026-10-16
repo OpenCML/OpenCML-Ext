@@ -55,11 +55,14 @@ export function loopDetails(model: FlowModel, node: FlowNode): LoopDetails | und
     }
 }
 
-// Reserve space for the compact interactive LOOP card while keeping the raw DOT intact.
+// Reserve display geometry while keeping the raw DOT intact.
 export function loopLayoutDot(raw: string, dot: DotGraph): string {
     const overrides: string[] = []
     const walk = (sub: DotSubgraph) => {
-        for (const node of sub.nodes) if (node.attrs.type === 'LOOP') overrides.push(`${JSON.stringify(node.id)} [label="", fixedsize=true, width=${148 / 72}, height=${56 / 72}];`)
+        for (const node of sub.nodes) {
+            if (node.attrs.type === 'LOOP') overrides.push(`${JSON.stringify(node.id)} [label="", fixedsize=true, width=${148 / 72}, height=${56 / 72}];`)
+            if (['BRCH', 'JOIN', 'GATE'].includes(node.attrs.type)) overrides.push(`${JSON.stringify(node.id)} [label="", shape=diamond, fixedsize=true, width=${96 / 72}, height=${68 / 72}];`)
+        }
         sub.subgraphs.forEach(walk)
     }
     walk(dot)

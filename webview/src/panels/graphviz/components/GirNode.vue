@@ -25,6 +25,16 @@ const props = defineProps<{
 }>()
 const functionValue = computed(() => props.data.attrs.function_value === '1')
 const boundary = computed(() => ['ARGS', 'EXIT'].includes(props.data.nodeType))
+// Use runtime kinds and explicit function-value metadata, never label text.
+const family = computed(() => boundary.value ? 'boundary'
+    : functionValue.value || ['FUNC', 'CALL'].includes(props.data.nodeType) ? 'function'
+    : ['BRCH', 'JOIN', 'GATE', 'LOOP', 'SYNC'].includes(props.data.nodeType) ? 'control'
+    : ['OPER', 'FILL', 'ACCS', 'CAST', 'COPY'].includes(props.data.nodeType) ? 'operation' : 'value')
+const diamond = computed(() => ['BRCH', 'JOIN', 'GATE'].includes(props.data.nodeType))
+const controlOutline = computed(() => {
+    const w = props.data.width, h = props.data.height
+    return `M ${w / 2},.5 L ${w - .5},${h / 2} L ${w / 2},${h - .5} L .5,${h / 2} Z`
+})
 const openSubgraph = inject<(scope: string) => void>('gir-open-subgraph')
 const nodeTitle = computed(() => {
     const data = props.data
@@ -48,10 +58,12 @@ const nodeTitle = computed(() => {
         :title="nodeTitle"
         :class="[
             `t-${data.nodeType.toLowerCase()}`,
-            { selected, boundary, 'function-value': functionValue, breakpoint: !boundary && data.breakpoint, paused: !boundary && data.paused }
+            `family-${family}`,
+            { selected, boundary, diamond, 'function-value': functionValue, breakpoint: !boundary && data.breakpoint, paused: !boundary && data.paused }
         ]"
         :style="{ width: `${data.width}px`, height: `${data.height}px` }"
     >
+        <svg v-if="diamond" class="control-outline" :viewBox="`0 0 ${data.width} ${data.height}`" aria-hidden="true"><path :d="controlOutline" /></svg>
         <template v-if="data.loop">
             <div class="loop-heading"><PanelIcon name="loop" :size="12" /><div class="gir-label" :title="nodeTitle">{{ loopLabel(data.loop) }}</div></div>
             <div class="loop-actions nodrag nopan">
@@ -70,23 +82,36 @@ const nodeTitle = computed(() => {
 
 <style scoped>
 .gir-node {
-    --node-accent: var(--vscode-symbolIcon-variableForeground, #75beff);
-    box-sizing: border-box; padding: 3px 8px; border: 1px solid var(--gir-line, #454545);
-    border-radius: 6px; background: var(--gir-bg, #1e1e1e); color: var(--gir-fg, #d4d4d4);
+    --node-accent: var(--gir-muted, #9d9d9d);
+    --node-base-line: color-mix(in srgb, var(--gir-fg, #d4d4d4) 55%, var(--gir-bg, #1e1e1e));
+    --node-line: var(--node-base-line);
+    --node-fill: var(--gir-bg, #1e1e1e);
+    box-sizing: border-box; padding: 3px 8px; border: 1px solid var(--node-line);
+    border-radius: 6px; background: var(--node-fill); color: var(--gir-fg, #d4d4d4);
     font-size: 11px; text-align: center; cursor: pointer; user-select: none;
     display: flex; flex-direction: column; justify-content: center; gap: 2px;
     box-shadow: 0 2px 5px #00000008;
 }
-.gir-node:hover { border-color: var(--node-accent); }
+.gir-node:hover { --node-line: var(--node-accent); border-color: var(--node-line); }
 .gir-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; font: 500 11px/1.2 var(--gir-mono, monospace); }
 .gir-type { color: var(--gir-muted, #9d9d9d); font-size: 8px; flex-shrink: 0; letter-spacing: .07em; line-height: 1.2; display: flex; align-items: center; justify-content: center; gap: 5px; }
 .gir-type::before { content: ''; width: 4px; height: 4px; border-radius: 50%; background: var(--node-accent); }
 .t-exit { --node-accent: var(--vscode-symbolIcon-eventForeground, #ee9d28); }
 .function-symbol { color: var(--node-accent); margin-right: 6px; }
-.function-value { --node-accent: var(--vscode-symbolIcon-functionForeground, #b180d7); }
+.family-function { --node-accent: var(--vscode-charts-purple, #b180d7); --node-line: color-mix(in srgb, var(--node-accent) 55%, var(--node-base-line)); --node-fill: color-mix(in srgb, var(--node-accent) 4%, var(--gir-bg)); border-radius: 9px; padding-inline: 12px; }
+.family-function::after { content: ''; position: absolute; inset: 5px; border-inline: 1px solid color-mix(in srgb, var(--node-accent) 50%, transparent); border-radius: 4px; pointer-events: none; }
+.family-operation { --node-accent: var(--vscode-charts-blue, #3794ff); border-radius: 2px; }
+.family-operation .gir-type::before { border-radius: 0; }
+.family-control { --node-accent: var(--vscode-charts-orange, #d18616); --node-line: color-mix(in srgb, var(--node-accent) 40%, var(--node-base-line)); --node-fill: color-mix(in srgb, var(--node-accent) 3%, var(--gir-bg)); border-radius: 4px; box-shadow: none; }
+.diamond, .diamond:hover, .gir-node.diamond.selected, .gir-node.diamond.paused { border-color: transparent; background: transparent; padding: 0; }
+.diamond .gir-label { max-width: 65%; align-self: center; }
+.family-control .gir-type::before { border-radius: 0; transform: rotate(45deg); }
+.control-outline { position: absolute; inset: -1px; width: calc(100% + 2px); height: calc(100% + 2px); overflow: visible; pointer-events: none; }
+.control-outline path { fill: var(--node-fill); stroke: var(--node-line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.family-control > :not(.control-outline) { position: relative; }
+.family-control > :deep(.vue-flow__handle) { position: absolute; }
 .function-value .gir-type { letter-spacing: 0; }
-.t-call { --node-accent: var(--vscode-symbolIcon-functionForeground, #b180d7); }
-.t-loop { --node-accent: var(--vscode-symbolIcon-functionForeground, #b180d7); padding: 7px 8px 5px; gap: 0; box-shadow: none; }
+.t-loop { padding: 7px 8px 5px; gap: 0; box-shadow: none; }
 .loop-heading { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; }
 .loop-heading > svg { flex-shrink: 0; color: var(--node-accent); }
 .loop-actions { display: flex; align-items: center; margin-top: 6px; padding-top: 3px; border-top: 1px solid var(--gir-line); }
@@ -97,10 +122,11 @@ const nodeTitle = computed(() => {
 .loop-actions button:active:not(:disabled) { background: var(--vscode-toolbar-activeBackground, #8883); }
 .loop-actions button:focus-visible { outline: 1px solid var(--vscode-focusBorder, #007fd4); outline-offset: 2px; }
 .loop-actions button:disabled { color: var(--vscode-disabledForeground, #858585); cursor: default; }
-.gir-node.selected { border-color: var(--gir-accent, #007fd4); box-shadow: 0 0 0 2px color-mix(in srgb, var(--gir-accent, #007fd4) 20%, transparent); }
+.gir-node.selected { --node-line: var(--gir-accent, #007fd4); border-color: var(--node-line); box-shadow: none; }
 .gir-node.t-loop.selected { box-shadow: none; }
 .gir-node.breakpoint { outline: 2px solid var(--vscode-debugIcon-breakpointForeground, #e51400); outline-offset: 2px; }
-.gir-node.paused { background: color-mix(in srgb, var(--vscode-editorWarning-foreground, #cca700) 12%, var(--gir-bg, #1e1e1e)); border-color: var(--vscode-editorWarning-foreground, #cca700); }
+.gir-node.paused { --node-fill: color-mix(in srgb, var(--vscode-editorWarning-foreground, #cca700) 12%, var(--gir-bg, #1e1e1e)); --node-line: var(--vscode-editorWarning-foreground, #cca700); border-color: var(--node-line); }
+:global(body.vscode-high-contrast) .gir-node:not(.selected):not(.paused), :global(body.vscode-high-contrast-light) .gir-node:not(.selected):not(.paused) { --node-line: var(--gir-fg); }
 .gir-node.boundary { border: 0; border-radius: 0; background: transparent; box-shadow: none; padding: 0; color: var(--gir-fg); }
 .boundary .gir-label { font: 10px/1.4 var(--vscode-font-family, sans-serif); }
 .boundary::after { content: ''; position: absolute; left: 0; right: 0; border-top: 1px solid var(--gir-edge, #858585); }

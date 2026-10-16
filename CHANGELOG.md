@@ -1,3 +1,8 @@
+## 1.11.4
+
+- Distinguish GIR node families with shape and restrained theme colors: rounded double-side function nodes, single-frame operations, and diamond branch/merge/gate nodes. Keep values neutral and preserve compact boundaries, handles and debugger state cues.
+- Verify node styling and existing graph interactions in light and dark themes.
+
 ## 1.11.3
 
 - Clarify pipeline command names: Run with Passes / Debug GIR Passes, with matching localized menu, command-palette, input and session titles. Verify the actual editor submenu in Chinese and English.

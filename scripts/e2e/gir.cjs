@@ -140,6 +140,19 @@ exports.run = async (vscode, workspace) => {
         await frame.getByRole('complementary', { name: label("Node details") }).waitFor({ state: 'visible' })
         await frame.getByRole('button', { name: label("Close node details") }).click()
         // Exercise nested sibling graphs without depending on runtime optimizations.
+        const families = 'digraph G { n [type="DATA",label="50000"]; f [type="FUNC",label="run"]; s [type="DATA",label="arm_call_then_effect r={}"]; a [type="OPER",label=":str/format"]; b [type="OPER",label=":io/println"]; z [type="DATA",label="0"]; g [type="GATE",label="GATE"]; x [type="EXIT",label="EXIT"]; n -> f [type="NORM"]; f -> a [type="WITH"]; s -> a [type="NORM"]; a -> b [type="NORM"]; b -> g [type="CTRL"]; z -> g [type="NORM"]; g -> x [type="NORM"]; }'
+        await frame.evaluate(dot => window.dispatchEvent(new MessageEvent('message', { data: { command: 'render', dot } })), families)
+        await frame.locator('.family-control .control-outline').waitFor()
+        assert.equal(await frame.locator('.family-function').count(), 1)
+        assert.equal(await frame.locator('.family-operation').count(), 2)
+        assert.equal(await frame.locator('.family-value').count(), 3)
+        await frame.getByRole('button', { name: label('Fit to view'), exact: true }).click()
+        await frame.page().screenshot({ path: path.join(workspace.uri.fsPath, 'gir-node-families-light.png') })
+        await vscode.workspace.getConfiguration('workbench').update('colorTheme', 'Default Dark Modern', vscode.ConfigurationTarget.Workspace)
+        await frame.waitForFunction(() => document.body.classList.contains('vscode-dark'))
+        await frame.page().screenshot({ path: path.join(workspace.uri.fsPath, 'gir-node-families-dark.png') })
+        await vscode.workspace.getConfiguration('workbench').update('colorTheme', 'Default Light Modern', vscode.ConfigurationTarget.Workspace)
+        await frame.waitForFunction(() => document.body.classList.contains('vscode-light'))
         const fixture = 'digraph G { subgraph cluster_a { label="A"; a [label="ARGS"]; b [label="EXIT"]; a -> b [label="0|0", type="WITH"]; } subgraph cluster_b { label="B"; subgraph cluster_c { c [label="DATA"]; d [label="EXIT"]; c -> d [label="0|0", type="NORM"]; } subgraph cluster_d { e [label="DATA"]; f [label="EXIT"]; e -> f [label="0|0", type="CTRL"]; } g [label="CALL"]; h [label="EXIT"]; g -> h [label="0", type="WITH_PORT"]; } }'
         await frame.evaluate(dot => window.dispatchEvent(new MessageEvent('message', { data: { command: 'render', dot } })), fixture)
         await frame.getByRole('button', { name: label("Display options"), exact: true }).click()
