@@ -69,6 +69,8 @@ These require a Camel build with node-level debugging support (origin spans in `
 
 Grammar maintenance: run `npm run test:grammar` to exercise VS Code's TextMate/Oniguruma tokenizer. Run `node scripts/sync-grammar.mjs --check <Camel-source-directory>` to check the keyword/operator inventory against the runtime, or omit `--check` to update it.
 
+Publishing: branch pushes run CI; version tags publish the tested VSIX to Marketplace using GitHub/Entra federation. See [the one-time identity setup and release steps](docs/publishing.md).
+
 - Scope-aware completion, member completion and signature help
 - Hover types and documentation, go to definition, references and symbol search
 - Rename with runtime safety checks, document highlights and semantic tokens

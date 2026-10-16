@@ -1,0 +1,42 @@
+name: Extension CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Check extension without a local Camel installation
+        run: |
+          npm run test:grammar
+          npm run test:i18n
+          npm run test:compatibility
+          node scripts/toolchain-test.mjs
+          node scripts/gir-source-test.mjs
+          node scripts/gir-hierarchy-test.mjs
+          node scripts/gir-explore-test.mjs
+          npx tsc --noEmit --skipLibCheck --esModuleInterop --target es2020 --module commonjs client/src/extension.ts server/src/server.ts
+      - run: npm run build
+      - name: Check tag version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: node --input-type=module -e "import fs from 'node:fs'; const v=JSON.parse(fs.readFileSync('package.json')).version; if(process.env.GITHUB_REF_NAME!=='v'+v) throw new Error('Tag must equal v'+v)"
+      - run: npx vsce package --no-dependencies --githubBranch "$GITHUB_SHA" --out extension.vsix
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension-vsix
+          path: extension.vsix
+          if-no-files-found: error

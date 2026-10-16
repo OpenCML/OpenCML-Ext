@@ -1,0 +1,86 @@
+name: Marketplace publishing
+
+on:
+  push:
+    tags: ['v*']
+    branches: [wzj-dev]
+    paths: ['.github/workflows/publish.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  AZURE_CLIENT_ID: 8cf50ab2-20c7-43f0-a65d-f861025d2c93
+  AZURE_TENANT_ID: c512153f-14c5-4263-8f13-464fbd3d2d77
+
+concurrency:
+  group: marketplace-publishing
+  cancel-in-progress: false
+
+jobs:
+  # Manual runs only test federation and expose the public Marketplace identity id.
+  # Add this id to the publisher before pushing a release tag.
+  identity:
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/wzj-dev'
+    runs-on: ubuntu-latest
+    environment: marketplace
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+      - name: Get Marketplace identity id
+        shell: bash
+        run: |
+          id=$(az rest --method get --url 'https://app.vssps.visualstudio.com/_apis/profile/profiles/me?api-version=7.1' --resource 499b84ac-1321-427f-aa17-267ca6975798 --query id --output tsv)
+          test -n "$id"
+          printf 'Marketplace identity ID: %s\n' "$id"
+          printf 'Add `%s` as a Contributor to the Kogler7 publisher. This run does not publish an extension.\n' "$id" >> "$GITHUB_STEP_SUMMARY"
+
+  build:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    uses: ./.github/workflows/ci.yml
+
+  publish:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    environment: marketplace
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: extension-vsix
+          path: release
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ env.AZURE_CLIENT_ID }}
+          tenant-id: ${{ env.AZURE_TENANT_ID }}
+          allow-no-subscriptions: true
+      - name: Publish the tested package
+        run: npx vsce publish --azure-credential --packagePath release/extension.vsix --skip-duplicate
+      - name: Attach package to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" release/extension.vsix --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" release/extension.vsix --verify-tag --title "$GITHUB_REF_NAME" --generate-notes
+          fi
