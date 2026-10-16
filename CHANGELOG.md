@@ -1,3 +1,10 @@
+## 1.11.0
+
+- Use the native Camel DAP debugger for compiler-pass and runtime debugging. Configure pass breakpoints, step through passes, and inspect the paused GIR with snapshot history and multi-session navigation.
+- Add a paused-memory inspector with region summaries, paged objects, hex/ASCII bytes and allocation stops when supported by the runtime. Keep memory inspection visible across debugger stops.
+- Enter an unambiguous main function automatically in hierarchy mode. Render DATA function values as compact function references while preserving full values and output types in details.
+- Localize the new debugger controls and memory views in English and Simplified Chinese. Requires a recent Camel runtime with the corresponding native DAP capabilities.
+
 ## 1.10.0
 
 - Use the versioned `std::jgir` JSON interchange by default. Graph references, output types, input kinds, port indices, source ranges and origins are structured fields; display labels no longer determine JSON navigation.
