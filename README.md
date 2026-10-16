@@ -225,3 +225,11 @@ not a supported launch mode. It selects its own worker port.
 Passes and main arguments are passed to Camel unchanged. `stepBy: "node"` and
 `frames: "subgraphs"` expose the lower-level execution view. VS Code's Variables,
 Call Stack, function breakpoints and exception controls use the native adapter.
+
+For compiler debugging, add `"stopOnPassEntry": true` to the launch configuration. The GIR
+panel opens automatically with the actual initial graph. **Next pass** advances to macro,
+inline and subsequent returned graphs, then hands off at runtime entry. To stop only at
+specific results, use `"passBreakpoints": [1, 2]` (0 = initial graph). These work in Release.
+The session strip separates the current execution position from the inspected snapshot;
+selecting history does not run anything, and **Return to current stop** restores the live view.
+Use **Source GIR** to leave session inspection. The selected VS Code session controls the panel.

@@ -74,16 +74,16 @@ Unsupported build-only allocation hooks are explained, not displayed as working 
 - [x] Validate launch, breakpoints, scopes/variables, faults and session teardown.
 
 ### M2 — Compiler pipeline debugging
-- [ ] Add release-capable pass boundary stops to the debug core.
-- [ ] Support per-occurrence pass breakpoints, pause-at-entry and pass stepping.
-- [ ] Serialize the actual current graph on the execution thread at a safe boundary.
-- [ ] Test repeated pass names, failed/consumed graphs, continue, restart and termination.
+- [x] Add release-capable pass boundary stops to the debug core.
+- [x] Support per-occurrence pass breakpoints, pause-at-entry and pass stepping.
+- [x] Serialize the actual current graph on the execution thread at a safe boundary.
+- [x] Test repeated pass names, failed/consumed graphs, continue, restart and termination.
 
 ### M3 — Session/GIR experience
-- [ ] Compact pipeline controls; distinct live position and inspected history.
-- [ ] Automatically reveal the correct GIR at a compiler stop and execution stop.
-- [ ] Handle multiple sessions, source refresh, stale results and return-to-current.
-- [ ] Real VS Code tests and screenshot review in Chinese/English and narrow panels.
+- [x] Compact pipeline controls; distinct live position and inspected history.
+- [x] Automatically reveal the correct GIR at a compiler stop and execution stop.
+- [x] Handle multiple sessions, source refresh, stale results and return-to-current.
+- [x] Real VS Code tests and screenshot review in Chinese/English and narrow panels.
 
 ### M4 — Memory and remaining capabilities
 - [ ] Region overview, paged hex and objects, explicit refresh and clear pause context.
@@ -121,3 +121,13 @@ changes on the existing feature branch; no force pushes, release tags or automat
   and unused debugPort controls rather than imply that a gateway attachment still works.
   Multi-session selection uses VS Code's selected session; the graph frontend never guesses
   the first worker. Ordinary debugging does not require LSP availability.
+
+- M2/M3 evidence: standard Release build; debugger plan 9/9 passed, including 32 pipeline
+  assertions (expanded with failure diagnostics before commit). Real VS Code pipeline E2E
+  passed in English/Chinese: initial/macro/inline graph changes, history without execution,
+  return-to-current, execution entry handoff, 320px controls and reviewed screenshots.
+  Additional E2E uses native session selection for two simultaneous stopped workers and
+  verifies returning to the first, then VS Code restart returns to initial GIR.
+- Boundary contract: index 0 is initial; later indices are after a pass that returned a graph.
+  We do not pretend to stop inside a transformation. A consumed graph ends the sequence;
+  pass stepping into a scheduler stops at runtime entry. No fictitious compiler stack/values.

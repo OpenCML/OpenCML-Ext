@@ -51,7 +51,7 @@ try {
         vscodeExecutablePath: process.env.VSCODE_EXECUTABLE_PATH || 'G:/DevTools/Microsoft VS Code/Code.exe',
         extensionDevelopmentPath: repoRoot,
         extensionTestsPath: path.join(__dirname, 'index.cjs'),
-        launchArgs: ['--locale', process.env.E2E_LOCALE || 'en', ...(mode === 'gir' ? ['--remote-debugging-port=19338'] : []), workspace, '--disable-extensions', '--user-data-dir', path.join(workspace, 'vscode-user'), '--skip-welcome', '--skip-release-notes', '--disable-workspace-trust']
+        launchArgs: ['--locale', process.env.E2E_LOCALE || 'en', ...(['gir', 'pipeline'].includes(mode) ? ['--remote-debugging-port=19338'] : []), workspace, '--disable-extensions', '--user-data-dir', path.join(workspace, 'vscode-user'), '--skip-welcome', '--skip-release-notes', '--disable-workspace-trust']
     })
     console.log('E2E PASSED')
     process.exit(0)

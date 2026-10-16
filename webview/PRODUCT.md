@@ -13,3 +13,8 @@ Structured loops expose separate condition/body routes on compact cards. Keep st
 LOOP nodes use two rows: a loop icon/title and unboxed navigation links. State explanations belong in the inspector or subgraph context bar, not on the graph node. Keep selection to a single border rather than a glow.
 
 Read versioned GIR JSON by default. Keep graph references and output types as data, independent of labels and layout. Show output types in hover/inspection rather than adding permanent labels. The graph engine receives generated layout DOT; the text view retains the original JSON. Unsupported structured runtimes fail explicitly.
+
+Debug session graphs come from native DAP and the stopped worker, never from recompiling the
+editor. A compact strip identifies the actual initial/after-pass/runtime stop, offers explicit
+pass stepping, and separates inspected history from execution position. Standard source
+stepping cannot silently mean a compiler step. Preserve theme tokens and wrap at narrow widths.

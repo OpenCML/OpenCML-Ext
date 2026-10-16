@@ -57,5 +57,7 @@
     "contributes.debuggers.0.configurationAttributes.launch.properties.env.description": "被调试程序的环境变量。",
     "contributes.debuggers.0.configurationAttributes.launch.properties.stopOnEntry.description": "在第一个可执行节点前暂停。",
     "contributes.debuggers.0.configurationAttributes.launch.properties.stepBy.description": "按源码行或单个 GIR 节点单步执行。",
-    "contributes.debuggers.0.configurationAttributes.launch.properties.frames.description": "显示函数调用帧或所有内部子图帧。"
+    "contributes.debuggers.0.configurationAttributes.launch.properties.frames.description": "显示函数调用帧或所有内部子图帧。",
+    "contributes.debuggers.0.configurationAttributes.launch.properties.stopOnPassEntry.description": "在任何编译遍执行前的初始 GIR 处暂停。",
+    "contributes.debuggers.0.configurationAttributes.launch.properties.passBreakpoints.description": "在 GIR 快照序号处暂停：0 为初始图，N 为第 N 个返回图的 pass 执行后。"
 }

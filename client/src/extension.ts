@@ -191,6 +191,8 @@ interface GirPanelState {
     pendingError?: string
     revision: number
     disposed: boolean
+    debugSessionId?: string
+    debugView?: Record<string, unknown>
 }
 
 // Renders the GIR webview panel: toolbar (pass picker / auto refresh / refresh),
@@ -226,6 +228,7 @@ function registerGirPanel(context: vscode.ExtensionContext): GirPanelState {
             switch (message.command) {
                 case 'ready':
                     sendGirPreferences(context, state)
+                    if (state.debugView) state.panel.webview.postMessage(state.debugView)
                     state.panel.webview.postMessage({ command: 'followSource', enabled: state.followSource })
                     if (state.pendingDot !== null || state.fileUri) {
                         state.panel.webview.postMessage({
@@ -250,7 +253,23 @@ function registerGirPanel(context: vscode.ExtensionContext): GirPanelState {
                             .then(doc => vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside))
                     }
                     return
+                case 'debugNextPass':
+                    void debugFactory?.currentSession()?.customRequest('camel/nextPass').then(undefined, error => vscode.window.showErrorMessage(String(error)))
+                    return
+                case 'debugContinue':
+                    void debugFactory?.currentSession()?.customRequest('continue', { threadId: 1 }).then(undefined, error => vscode.window.showErrorMessage(String(error)))
+                    return
+                case 'debugCurrentGraph':
+                    void renderDebugSession(context, state)
+                    return
+                case 'debugSource':
+                    state.debugSessionId = undefined
+                    state.debugView = undefined
+                    state.panel.webview.postMessage({ command: 'debugState', state: null })
+                    if (state.fileUri) void renderForFile(state, state.fileUri, true)
+                    return
                 case 'refresh':
+                    if (state.debugSessionId) { void renderDebugSession(context, state); return }
                     if (state.fileUri) {
                         renderForFile(state, state.fileUri, true)
                     }
@@ -354,7 +373,7 @@ let lastCamelEditor: vscode.TextEditor | undefined
 function followActiveSource(editor: vscode.TextEditor | undefined) {
     if (!editor || editor.document.languageId !== 'cml' || editor.document.uri.scheme !== 'file') return
     lastCamelEditor = editor
-    if (sourceRevealDepth || !girState?.followSource || girState.fileUri === editor.document.uri.fsPath) return
+    if (girState?.debugSessionId || sourceRevealDepth || !girState?.followSource || girState.fileUri === editor.document.uri.fsPath) return
     girState.fileUri = editor.document.uri.fsPath
     void renderForFile(girState, girState.fileUri, false)
 }
@@ -383,12 +402,16 @@ async function fetchPassGraphs(): Promise<PassGraphEntry[]> {
 }
 
 /** Push the per-pass snapshot list to the panel (empty when camel-db has none). */
+let snapshotListRevision = 0
 async function pushPassGraphs(): Promise<void> {
+    const revision = ++snapshotListRevision
+    const sessionId = debugFactory?.currentSession()?.id
     const graphs = await fetchPassGraphs()
+    if (revision !== snapshotListRevision || sessionId !== debugFactory?.currentSession()?.id) return
     girState?.panel.webview.postMessage({ command: 'passGraphs', graphs, error: passGraphError })
 }
 
-/** GET /api/pass-graph and push one snapshot's DOT to the panel. */
+/** Read an immutable structured snapshot from the selected native DAP session. */
 async function pushPassGraph(index: unknown): Promise<void> {
     const i = Number(index)
     const session = debugFactory?.currentSession()
@@ -399,7 +422,7 @@ async function pushPassGraph(index: unknown): Promise<void> {
     try {
         const data = await session.customRequest('camel/passGraph', { index: i })
         if (session.id !== debugFactory?.currentSession()?.id) return
-        girState?.panel.webview.postMessage({ command: 'passGraph', ...data })
+        girState?.panel.webview.postMessage({ command: 'passGraph', ...data, dot: data.gir })
     } catch (error) {
         girState?.panel.webview.postMessage({ command: 'passGraph', index: i, pass: null, dot: null, error: String(error) })
     }
@@ -422,6 +445,7 @@ async function showGirPanel(context: vscode.ExtensionContext) {
 }
 
 async function renderForFile(state: GirPanelState, filePath: string, errorToast: boolean) {
+    if (state.debugSessionId) return
     const revision = ++state.revision
     const pass = state.pass
     state.pendingDot = null
@@ -442,6 +466,33 @@ async function renderForFile(state: GirPanelState, filePath: string, errorToast:
         state.pendingError = String(error)
         state.panel.webview.postMessage({ command: 'render', dot: null, fileUri: filePath, fileName: path.basename(filePath), pass, error: state.pendingError })
         if (errorToast) getOutputChannel().appendLine(`GIR generation failed: ${error}`)
+    }
+}
+
+/** The graph comes from the stopped worker, never a fresh CLI compilation. */
+async function renderDebugSession(context: vscode.ExtensionContext, state?: GirPanelState) {
+    const session = debugFactory?.currentSession()
+    if (!session) return
+    state ??= girState ?? (girState = registerGirPanel(context))
+    const revision = ++state.revision
+    state.debugSessionId = session.id
+    state.pendingDot = null
+    state.pendingError = undefined
+    state.panel.reveal(vscode.ViewColumn.Beside, true)
+    state.panel.webview.postMessage({ command: 'loading', fileName: session.name, pass: 'std::jgir' })
+    try {
+        const result = await session.customRequest('camel/structuredGraph')
+        if (state.disposed || revision !== state.revision || session.id !== debugFactory?.currentSession()?.id) return
+        state.pendingDot = result.gir
+        state.pendingError = undefined
+        state.fileUri = session.configuration.program ?? state.fileUri
+        state.panel.title = `GIR · ${session.name}`
+        state.panel.webview.postMessage({ command: 'render', dot: result.gir, fileName: session.name, pass: 'std::jgir' })
+        void pushPassGraphs()
+    } catch (error) {
+        if (revision !== state.revision || state.disposed) return
+        state.pendingError = String(error)
+        state.panel.webview.postMessage({ command: 'render', dot: null, error: String(error), fileName: session.name })
     }
 }
 
@@ -516,9 +567,22 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.debug.registerDebugAdapterDescriptorFactory('camel', debugFactory)
     )
-    debugFactory.onDidStop = session => {
+    debugFactory.onDidChangeState = (session, state) => {
+        if (session.id !== debugFactory?.currentSession()?.id && session.id !== girState?.debugSessionId) return
+        if (state.status !== 'paused' && girState?.debugSessionId === session.id) ++girState.revision
+        if (girState) {
+            girState.debugView = { command: 'debugState', sessionId: session.id, name: session.name, state }
+            if (state.status !== 'paused') girState.panel.webview.postMessage(girState.debugView)
+        }
+    }
+    debugFactory.onDidStop = (session, stopped) => {
         if (session.id !== debugFactory?.currentSession()?.id) return
-        void pushPassGraphs()
+        void renderDebugSession(context).then(() => {
+            if (session.id === debugFactory?.currentSession()?.id && girState) {
+                girState.debugView = { command: 'debugState', sessionId: session.id, name: session.name, state: stopped }
+                girState.panel.webview.postMessage(girState.debugView)
+            }
+        })
     }
     context.subscriptions.push(
         vscode.debug.registerDebugConfigurationProvider('camel', {

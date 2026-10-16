@@ -297,6 +297,12 @@ const pausedOrigin = ref(0)
 const snapshots = ref<PassGraphEntry[]>([])
 const snapshotError = ref('')
 const snapshotSel = ref<number | null>(null)
+const debugStatus = ref<'running' | 'paused' | 'ended' | null>(null)
+const debugSessionName = ref('')
+const pipelineStage = ref<{ index: number; pass: string | null; boundary: string } | null>(null)
+const executionLabel = computed(() => debugStatus.value === 'running' ? t('Running') : debugStatus.value === 'ended' ? t('Session ended') : pipelineStage.value ? (pipelineStage.value.pass ? t('After {0}', pipelineStage.value.pass) : t('Before compiler passes')) : t('Runtime paused'))
+function debugAction(command: string) { vscode.postMessage({ command }) }
+
 
 const breakpoints = new Set<string>()
 
@@ -516,10 +522,11 @@ function changePass() {
 
 function changeSnapshot() {
     if (snapshotSel.value === null) {
-        // Back to the original GIR view.
-        vscode.postMessage({ command: 'refresh' })
+        vscode.postMessage({ command: debugStatus.value ? 'debugCurrentGraph' : 'refresh' })
         return
     }
+    loading.value = true
+    girText.value = ''
     status.value = t("Loading pass snapshot…")
     vscode.postMessage({ command: 'passGraph', index: snapshotSel.value })
 }
@@ -537,7 +544,7 @@ function onPassGraph(message: PassGraphMessage) {
         command: 'render',
         dot: message.dot,
         fileName: fileName.value,
-        pass: message.pass ?? undefined
+        pass: 'std::jgir'
     })
 }
 
@@ -584,6 +591,11 @@ function onMessage(event: MessageEvent) {
         // Any extension-pushed render is the original GIR view; leave snapshot mode.
         snapshotSel.value = null
         renderDotMessage(message as RenderMessage)
+    } else if (message.command === 'debugState') {
+        debugStatus.value = message.state?.status ?? null
+        debugSessionName.value = message.name ?? ''
+        pipelineStage.value = message.state?.pipeline ?? null
+        if (!message.state) snapshots.value = []
     } else if (message.command === 'passGraphs') {
         snapshotError.value = typeof message.error === 'string' ? message.error : ''
         const raw: unknown[] = Array.isArray(message.graphs) ? message.graphs : []
@@ -664,6 +676,17 @@ onUnmounted(() => {
                 <button class="icon-button" :disabled="loading" :aria-label='t("Refresh")' :title='t("Refresh current editor contents")' @click="refresh"><PanelIcon name="refresh" :class="{ spinning: loading }" /></button>
             </div>
         </header>
+        <section v-if="debugStatus" class="debug-strip" :aria-label="t('Debug session')">
+            <span class="debug-position" :title="debugSessionName">{{ executionLabel }}</span>
+            <select v-model="snapshotSel" @change="changeSnapshot" :aria-label="t('Inspected stage')" :disabled="!!snapshotError">
+                <option :value="null" :disabled="debugStatus !== 'paused'">{{ t('Current stop') }}</option>
+                <option v-for="g in snapshots" :key="g.index" :value="g.index">{{ g.index }} · {{ g.pass === null ? t('Initial GIR') : t('After {0}', g.pass) }}</option>
+            </select>
+            <button v-if="snapshotSel !== null" :disabled="debugStatus !== 'paused'" @click="snapshotSel = null; debugAction('debugCurrentGraph')">{{ t('Return to current stop') }}</button>
+            <button v-if="pipelineStage" :disabled="debugStatus !== 'paused' || loading" @click="debugAction('debugNextPass')">{{ t('Next pass') }} →</button>
+            <button :disabled="debugStatus !== 'paused'" @click="debugAction('debugContinue')">{{ t('Continue') }}</button>
+            <button class="debug-source" :aria-label="t('Source GIR')" :title="t('Source GIR')" @click="debugAction('debugSource')"><PanelIcon name="file" :size="14" /></button>
+        </section>
         <nav v-if="view === 'graph' && browsing === 'hierarchy'" class="hierarchy-bar" :aria-label='t("Graph navigation")'>
 
             <template v-if="browsing === 'hierarchy'">
@@ -681,17 +704,11 @@ onUnmounted(() => {
         </nav>
         <section v-if="showOptions" id="gir-options" class="options" :aria-label='t("Display options")'>
             <label class="option-field"><span> {{ t("Output format") }} </span>
-                <select v-model="pass" @change="changePass" title="GIR pass" :disabled="snapshotSel !== null">
+                <select v-model="pass" @change="changePass" title="GIR pass" :disabled="snapshotSel !== null || !!debugStatus">
                     <option value="std::jgir"> {{ t("jgir · JSON") }} </option>
                     <option value="std::gir"> {{ t("gir · Compact") }} </option>
                     <option value="std::rgir"> {{ t("rgir · Rich") }} </option>
                     <option value="std::agir"> {{ t("agir · Roles") }} </option>
-                </select>
-            </label>
-            <label class="option-field"><span> {{ t("Compilation stage") }} </span>
-                <select v-model="snapshotSel" :disabled="!!snapshotError" @change="changeSnapshot" :title="snapshotError || t('Compiler pass snapshots (requires a debug session)')">
-                    <option :value="null"> {{ t("Current source") }} </option>
-                    <option v-for="g in snapshots" :key="g.index" :value="g.index">{{ g.pass === null ? t("Initial GIR") : `${g.index} · ${g.pass}` }}</option>
                 </select>
             </label>
             <label class="option-field"><span> {{ t("Graph arrangement") }} </span>
@@ -707,7 +724,7 @@ onUnmounted(() => {
                 <label><input type="checkbox" v-model="edgeFilters.ctrl" /> {{ t("Control dependency") }} </label>
                 <label><input type="checkbox" v-model="hideFiltered" /> {{ t("Hide unchecked edge types") }} </label>
             </fieldset>
-            <span v-if="!snapshots.length" class="option-hint"> {{ snapshotError || t("Compilation snapshots are available while debugging") }} </span>
+            <span v-if="debugStatus && snapshotError" class="option-hint"> {{ snapshotError || t("Compilation snapshots are available while debugging") }} </span>
         </section>
         <div v-if="showOptions && view === 'graph'" class="edge-legend" :aria-label='t("Edge legend")'>
             <span><i class="norm"></i> {{ t("Normal input") }} </span><span><i class="with"></i> {{ t("Context input") }} </span><span><i class="ctrl"></i> {{ t("Control dependency") }} </span>
@@ -827,6 +844,12 @@ h1 { margin: 0; font-size: 13px; font-weight: 650; letter-spacing: .04em; }
 .view-switch button:hover { color: var(--gir-fg); }
 .view-meta { color: var(--gir-muted); font-size: 10px; letter-spacing: .02em; }
 .export-actions { margin-left: auto; }
+.debug-strip { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; padding: 5px 12px; border-bottom: 1px solid var(--gir-line); background: var(--gir-surface); font-size: 11px; }
+.debug-position { color: var(--gir-fg); font-weight: 600; max-width: 26ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.debug-strip select, .debug-strip button { font: inherit; color: var(--gir-fg); background: var(--gir-bg); border: 1px solid var(--gir-line); border-radius: 4px; padding: 3px 6px; min-height: 24px; }
+.debug-strip select { min-width: 0; max-width: 30ch; }
+.debug-strip button:disabled { opacity: .5; cursor: default; }
+.debug-strip .debug-source { margin-left: auto; border-color: transparent; color: var(--gir-muted); }
 .options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 16px; padding: 14px 16px; background: var(--gir-surface); border-bottom: 1px solid var(--gir-line); flex-shrink: 0; }
 .option-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; color: var(--gir-muted); font-size: 11px; }
 .option-field select { width: 100%; min-height: 28px; border: 1px solid var(--gir-line); border-radius: 4px; background: var(--vscode-dropdown-background, var(--gir-bg)); color: var(--gir-fg); padding: 0 6px; }
