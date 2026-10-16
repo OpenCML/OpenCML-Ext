@@ -2,7 +2,7 @@
     "name": "open-cml-extension",
     "displayName": "OpenCML-Ext",
     "description": "%description%",
-    "version": "1.8.1",
+    "version": "1.8.2",
     "publisher": "Kogler7",
     "icon": "assets/icon.jpg",
     "type": "module",
@@ -417,7 +417,8 @@
         ],
         "configurationDefaults": {
             "[cml]": {
-                "editor.semanticHighlighting.enabled": true
+                "editor.semanticHighlighting.enabled": true,
+                "editor.inlayHints.enabled": "offUnlessPressed"
             }
         },
         "keybindings": [

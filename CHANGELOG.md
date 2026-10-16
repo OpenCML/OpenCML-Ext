@@ -1,3 +1,9 @@
+## 1.8.2
+
+- Default Camel inlay hints to VS Code's hold-to-show mode (`offUnlessPressed`, Ctrl+Alt), respecting explicit editor preferences.
+- With the updated Camel language server, place parameter names before whole positional arguments, including arrays, lambdas, tuples and expressions. Use parser argument ranges and omit redundant names, named arguments and uncertain positions after spreads.
+- Add native LSP argument-boundary checks and real-editor checks for the language default and user overrides.
+
 ## 1.8.1
 
 - Refresh Camel TextMate highlighting against the current runtime token table: namespaces, loops, reserved words, operators, qualified declarations, calls, annotations, numeric literals and comments.

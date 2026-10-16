@@ -65,6 +65,16 @@ These require a Camel build with node-level debugging support (origin spans in `
 
 ### Language features
 
+Camel defaults to `"editor.inlayHints.enabled": "offUnlessPressed"`: hold **Ctrl+Alt** to show hints, then release to hide them. Existing explicit language settings take precedence. To choose another behavior, set this in VS Code settings:
+
+```json
+"[cml]": {
+    "editor.inlayHints.enabled": "offUnlessPressed"
+}
+```
+
+Use `on` for permanent hints, `onUnlessPressed` to hide them while holding Ctrl+Alt, or `off` to disable them. / 默认按住 Ctrl+Alt 临时显示类型和参数提示，松开隐藏；可在 `[cml]` 设置中调整。已有显式语言设置优先。
+
 基础着色由 TextMate 规则提供，不依赖 LSP；语义高亮会进一步识别函数引用、参数、类型和导入符号。关闭 `editor.semanticHighlighting.enabled` 或语言服务尚未启动时，关键字、字符串、注释、数字、运算符、函数声明与明确的调用仍会着色。`let g = inc` 中 `inc` 的符号身份需要语义分析。
 
 Grammar maintenance: run `npm run test:grammar` to exercise VS Code's TextMate/Oniguruma tokenizer. Run `node scripts/sync-grammar.mjs --check <Camel-source-directory>` to check the keyword/operator inventory against the runtime, or omit `--check` to update it.
@@ -76,7 +86,7 @@ Publishing: branch pushes run CI; version tags publish the tested VSIX to Market
 - Rename with runtime safety checks, document highlights and semantic tokens
 - With the updated native server: workspace references (including unopened files), cross-file exported-function rename, incoming/outgoing call hierarchy, named type definitions, folding and selection expansion.
 - Unsaved imported sources participate in analysis; changes, closes and external file updates invalidate dependent diagnostics.
-- Inferred local types and unambiguous literal argument names appear as inlay hints. A unique one-character unresolved-name correction is offered only after recompilation succeeds.
+- Inferred local types and unambiguous positional argument names appear as inlay hints. Parameter names precede the entire argument, including arrays, lambdas and expressions. A unique one-character unresolved-name correction is offered only after recompilation succeeds.
 - Library editing does not require `main`: the entry-only missing-main diagnostic is omitted in the editor. Running a file still checks entry requirements.
 - Diagnostics via `camel check`-equivalent pipeline (syntax + semantic errors with ranges and suggestions)
 - Document formatting via `camel-format`
@@ -172,7 +182,7 @@ Search for `opencmlLanguageServer` in VS Code Settings. All new settings have En
 | --- | --- | --- |
 | `diagnostics.trigger` | `onChange` | Update problems after edits or on save (`onSave`). / 输入后或保存时更新问题列表。 |
 | `inlayHints.types` | `true` | Show inferred local types. / 显示推断的局部类型。 |
-| `inlayHints.parameterNames` | `true` | Show names for unambiguous literal arguments. / 显示明确的字面量实参对应的参数名。 |
+| `inlayHints.parameterNames` | `true` | Show names before unambiguous positional arguments. / 在明确的位置实参前显示参数名。 |
 | `diagnostics.debounceMs` | `300` | Delay diagnostic requests, 0–5000 ms. / 诊断请求等待时间。 |
 | `diagnostics.severityOverrides` | `{}` | Diagnostic code → `error`, `warning`, `information`, `hint`, `off`. / 按编号调整诊断级别。 |
 | `gir.followActiveEditor` | `true` | Follow the active CML file. / 跟随当前源码。 |

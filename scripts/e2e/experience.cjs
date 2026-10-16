@@ -75,6 +75,11 @@ exports.run = async (vscode, workspace) => {
 
     const liveLib = await open('live_lib.cml', 'module live_lib\nexport func increment(value: int): int { return value + 1 }\n')
     const liveMain = await open('live_main.cml', 'import { increment } from live_lib\nfunc main(): int {\n let answer = increment(2)\n return answer\n}\n')
+    const editorSettings = vscode.workspace.getConfiguration('editor', { uri: liveMain.uri, languageId: 'cml' })
+    assert.equal(editorSettings.get('inlayHints.enabled'), 'offUnlessPressed', 'Camel should show hints only while Ctrl+Alt is held by default')
+    await editorSettings.update('inlayHints.enabled', 'on', vscode.ConfigurationTarget.Workspace, true)
+    assert.equal(vscode.workspace.getConfiguration('editor', { uri: liveMain.uri, languageId: 'cml' }).get('inlayHints.enabled'), 'on', 'explicit user preferences must override the extension default')
+    await editorSettings.update('inlayHints.enabled', undefined, vscode.ConfigurationTarget.Workspace, true)
     await new Promise(r => setTimeout(r, 600))
     assert.equal(vscode.languages.getDiagnostics(liveLib.uri).length, 0, 'library must not require main')
     await replace(liveLib, 'module live_lib\nexport func increment(value: float): float { return value + 1.0 }\n')

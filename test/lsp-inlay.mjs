@@ -22,6 +22,11 @@ func main(): int {
  let quoted = text('hello')
  return scalar(6)
 }
+func extra(): int {
+ let value = 3
+ let same = scalar(value)
+ return same
+}
 `
 const ls = new LspClient(exe, ['--stdio'])
 try {
@@ -38,11 +43,21 @@ try {
     } else {
         assert.deepEqual(diagnostics, [])
         assert.deepEqual(hints.map(h => ({ label: h.label, position: h.position })), [
+            { label: 'a14:', position: labelAt(8, '[') },
+            { label: 'a15:', position: labelAt(8, '(p32') },
+            { label: 'value:', position: labelAt(9, '[') },
             { label: 'value:', position: labelAt(9, '5') },
+            { label: 'value:', position: labelAt(10, '(1') },
+            { label: 'value:', position: labelAt(11, '{') },
+            { label: 'value:', position: labelAt(12, '1 + 2') },
+            { label: 'value:', position: labelAt(13, '(9') },
             { label: 'value:', position: labelAt(14, '4') },
             { label: 'value:', position: labelAt(15, "'hello'") },
             { label: 'value:', position: labelAt(16, '6') }
-        ], 'Only direct standalone literal arguments receive parameter names, never nested array/tuple/record elements or subexpressions')
-        console.log('INLAY_OK: f13 array regression, nested calls, tuples, records, expressions, parentheses, comments and single-quoted strings')
+        ], 'Hints attach to whole arguments, never to their nested elements')
+        const insideArray = labelAt(8, '7')
+        const innerHints = await ls.request('textDocument/inlayHint', { ...doc, range: { start: insideArray, end: { ...insideArray, character: insideArray.character + 1 } } })
+        assert(!innerHints.some(h => h.kind === 2), 'a viewport inside an array cannot move its outer parameter hint onto an element')
+        console.log('INLAY_OK: whole arrays/lambdas, nested calls, tuples, records, expressions, comments, strings and partial viewport')
     }
 } finally { await ls.close() }

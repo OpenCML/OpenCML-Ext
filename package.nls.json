@@ -50,5 +50,5 @@
     "configuration.gir.hoverNeighborhood.downstream": "Downstream",
     "configuration.gir.hoverNeighborhood.off": "Off",
     "configuration.inlayHints.types": "Show inferred variable types.",
-    "configuration.inlayHints.parameterNames": "Show parameter names for unambiguous literal arguments."
+    "configuration.inlayHints.parameterNames": "Show parameter names before unambiguous positional arguments."
 }

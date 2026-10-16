@@ -50,5 +50,5 @@
     "configuration.gir.hoverNeighborhood.downstream": "下游",
     "configuration.gir.hoverNeighborhood.off": "关闭",
     "configuration.inlayHints.types": "显示变量的推断类型。",
-    "configuration.inlayHints.parameterNames": "为可明确匹配的字面量实参显示参数名。"
+    "configuration.inlayHints.parameterNames": "在可明确匹配的位置实参前显示参数名。"
 }
