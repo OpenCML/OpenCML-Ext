@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
-import http from 'node:http'
 import { loadTs } from './load-ts.mjs'
 const { classifyVersion, inspectCompatibility, languageFeatures, MINIMUM_CAMEL } = await loadTs('client/src/compatibility.ts')
 assert.equal(JSON.parse(fs.readFileSync('package.json')).camelCompatibility.minimumSupportedVersion, MINIMUM_CAMEL)
@@ -43,18 +42,10 @@ assert.equal(languageFeatures(undefined).completion.supported, null)
 assert.equal(languageFeatures({ completionProvider: {}, definitionProvider: false }).completion.supported, true)
 assert.equal(languageFeatures({}).nativeGir.supported, false)
 assert.equal(languageFeatures({ experimental: { camelGraphProvider: true } }).nativeGir.supported, true)
-const { apiGet, DebugHttpError } = await loadTs('client/src/debug/http.ts')
-const server = http.createServer((req, res) => { res.writeHead(req.url === '/missing' ? 404 : 500); res.end('test') })
-await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
-try {
-    const port = server.address().port
-    await assert.rejects(apiGet(port, '/missing'), error => error instanceof DebugHttpError && error.status === 404 && error.message.includes('does not support'))
-    await assert.rejects(apiGet(port, '/failure'), error => error.status === 500 && !error.message.includes('does not support'))
-} finally { await new Promise(resolve => server.close(resolve)) }
 if (process.env.CAMEL_EXE_PATH) {
     const actual = await inspectCompatibility(process.env.CAMEL_EXE_PATH)
     assert(actual.features.cliGir.supported)
     assert(actual.features.cliDiagnostics.supported)
     console.log('COMPATIBILITY_REAL_OK:', actual.version, actual.features)
 }
-console.log('COMPATIBILITY_OK: versions, backports, absent capabilities, probe cleanup and HTTP errors')
+console.log('COMPATIBILITY_OK: versions, backports, absent capabilities, probe cleanup')

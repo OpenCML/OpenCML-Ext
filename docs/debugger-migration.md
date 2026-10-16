@@ -139,3 +139,6 @@ changes on the existing feature branch; no force pushes, release tags or automat
 - M4 remaining gate: Windows Debug build fails at the PE export limit (69,406 symbols vs 65,535).
   Allocation hooks are implemented but their supported-build stop/resume validation is pending.
   Do not retire the old frontend or mark M4 complete before that gate passes.
+
+- M5 cleanup: removed the plugin-only HTTP client and its obsolete transport test. Native
+  DAP owns all current debugger requests; backend HTTP/REPL remain intact.

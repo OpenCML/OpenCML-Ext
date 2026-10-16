@@ -12,6 +12,6 @@
         "types": ["vscode"],
         "baseUrl": "."
     },
-    "include": ["src", "../webview/src"],
+    "include": ["src"],
     "exclude": ["node_modules", ".vscode-test"]
 }
