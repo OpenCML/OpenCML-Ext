@@ -149,6 +149,7 @@ exports.run = async (vscode, workspace) => {
         assert.deepEqual(controlSize, { width: 80, height: 40 })
         assert.equal(await frame.locator('.family-function').count(), 1)
         assert.equal(await frame.locator('.family-function .function-symbol').count(), 1)
+        assert(await frame.locator('.family-function .gir-label').evaluate(node => node.scrollWidth <= node.clientWidth), 'short function name must fit beside the icon')
         assert.equal(await frame.locator('.family-operation .function-symbol, .family-value .function-symbol').count(), 0)
         assert.equal(await frame.locator('.family-operation').count(), 2)
         assert.equal(await frame.locator('.family-value').count(), 3)
