@@ -11,7 +11,7 @@
         "pub": "node ./publish.js",
         "test:i18n": "node scripts/localization-test.mjs",
         "test:compatibility": "node scripts/compatibility-test.mjs",
-        "test:lsp": "node scripts/toolchain-test.mjs && node scripts/lsp-smoke-test.mjs && node scripts/lsp-camel-ls-check.mjs && node test/lsp-workspace.mjs",
+        "test:lsp": "node scripts/toolchain-test.mjs && node scripts/lsp-smoke-test.mjs && node scripts/lsp-camel-ls-check.mjs && node test/lsp-workspace.mjs && node test/lsp-inlay.mjs",
         "test:grammar": "node scripts/grammar-test.mjs"
     },
     "engines": {
