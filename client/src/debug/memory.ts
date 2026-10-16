@@ -14,6 +14,7 @@ export class MemoryInspector {
         context.subscriptions.push(vscode.commands.registerCommand('camel.showMemory', () => this.show()),
             vscode.debug.onDidChangeActiveDebugSession(() => this.update()))
     }
+    get active(): boolean { return this.panel?.active ?? false }
     show() {
         if (!this.panel) {
             this.panel = vscode.window.createWebviewPanel('camel.memory', t('Camel Memory'), vscode.ViewColumn.Beside,

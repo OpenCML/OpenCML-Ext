@@ -474,7 +474,7 @@ async function renderForFile(state: GirPanelState, filePath: string, errorToast:
 }
 
 /** The graph comes from the stopped worker, never a fresh CLI compilation. */
-async function renderDebugSession(context: vscode.ExtensionContext, state?: GirPanelState) {
+async function renderDebugSession(context: vscode.ExtensionContext, state?: GirPanelState, reveal = true) {
     const session = debugFactory?.currentSession()
     if (!session) return
     state ??= girState ?? (girState = registerGirPanel(context))
@@ -482,7 +482,7 @@ async function renderDebugSession(context: vscode.ExtensionContext, state?: GirP
     state.debugSessionId = session.id
     state.pendingDot = null
     state.pendingError = undefined
-    state.panel.reveal(vscode.ViewColumn.Beside, true)
+    if (reveal) state.panel.reveal(vscode.ViewColumn.Beside, true)
     state.panel.webview.postMessage({ command: 'loading', fileName: session.name, pass: 'std::jgir' })
     try {
         const result = await session.customRequest('camel/structuredGraph')
@@ -583,7 +583,7 @@ export function activate(context: vscode.ExtensionContext) {
     }
     debugFactory.onDidStop = (session, stopped) => {
         if (session.id !== debugFactory?.currentSession()?.id) return
-        void renderDebugSession(context).then(() => {
+        void renderDebugSession(context, undefined, !memoryInspector.active).then(() => {
             if (session.id === debugFactory?.currentSession()?.id && girState) {
                 girState.debugView = { command: 'debugState', sessionId: session.id, name: session.name, state: stopped }
                 girState.panel.webview.postMessage(girState.debugView)

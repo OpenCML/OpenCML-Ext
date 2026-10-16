@@ -41,7 +41,7 @@ function receive(event: MessageEvent) {
         revision = message.revision
         if (sessionId !== (message.sessionId ?? '')) initialized = false
         sessionId = message.sessionId ?? ''; name.value = message.name ?? ''; status.value = message.status
-        allocationContext.value = message.allocation ? t('Before allocating {0} in {1}', sizeText(message.allocation.size), message.allocation.space) : ''
+        allocationContext.value = message.allocation ? t('Allocated {0} in {1}', sizeText(message.allocation.size), message.allocation.space) : ''
         if (changed) {
             ++id; pending = null; busy.value = false; error.value = ''
             regions.value = []; bytes.value = []; objects.value = []; hasMore.value = false
@@ -109,7 +109,7 @@ onUnmounted(() => window.removeEventListener('message', receive))
                 </template>
             </section>
             <section v-if="regions.length" class="allocation" :aria-label="t('Allocation breakpoints')">
-                <label><input type="checkbox" :checked="allocation.enabled" :disabled="!allocation.supported || busy" @change="configureAllocation(($event.target as HTMLInputElement).checked)" />{{ t('Pause before allocations') }}</label>
+                <label><input type="checkbox" :checked="allocation.enabled" :disabled="!allocation.supported || busy" @change="configureAllocation(($event.target as HTMLInputElement).checked)" />{{ t('Pause after allocations') }}</label>
                 <select v-model="space" :disabled="!allocation.supported || busy" :aria-label="t('Allocation space')" @change="configureAllocation(allocation.enabled)">
                     <option value="">{{ t('All spaces') }}</option><option v-for="value in ['auto.birth', 'auto.haven', 'auto.elder', 'auto.large', 'bump', 'meta', 'perm']" :key="value">{{ value }}</option>
                 </select>

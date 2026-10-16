@@ -1,6 +1,6 @@
 # Debugger migration goal
 
-Status: active · Owner: this Codex goal · Started: 2026-10-16
+Status: complete · Owner: this Codex goal · Started: 2026-10-16
 
 ## Outcome
 
@@ -87,15 +87,15 @@ Unsupported build-only allocation hooks are explained, not displayed as working 
 
 ### M4 — Memory and remaining capabilities
 - [x] Region overview, paged hex and objects, explicit refresh and clear pause context.
-- [ ] Allocation/space breakpoints only when supported; retain backend diagnostics.
-- [ ] Validate pagination, invalid addresses, session end and unsupported build behavior.
+- [x] Allocation/space breakpoints only when supported; retain backend diagnostics.
+- [x] Validate pagination, invalid addresses, session end and unsupported build behavior.
 
 ### M5 — Retire standalone frontend
-- [ ] Demonstrate every useful ledger capability or document intentional native replacement.
-- [ ] Remove tools/debugger/ui, serve_ui.py, embed_ui.py and frontend-only npm entries.
-- [ ] Update debugger principles, README, API/user docs and references.
-- [ ] Preserve CLI/REPL, DAP, HTTP backend as needed and all relevant regression tests.
-- [ ] Final build, integration tests, bilingual UX review; focused commits pushed in both repos.
+- [x] Demonstrate every useful ledger capability or document intentional native replacement.
+- [x] Remove tools/debugger/ui, serve_ui.py, embed_ui.py and frontend-only npm entries.
+- [x] Update debugger principles, README, API/user docs and references.
+- [x] Preserve CLI/REPL, DAP, HTTP backend as needed and all relevant regression tests.
+- [x] Final build, integration tests, bilingual UX review; focused commits pushed in both repos.
 
 ## Verification and operating constraints
 
@@ -136,9 +136,55 @@ changes on the existing feature branch; no force pushes, release tags or automat
   UI passed English and Chinese with actual heap byte/object comparisons, paging/end, no-session
   and ended-session states, stop invalidation, explicit refresh, unsupported allocation controls
   and 320px controls. Overview now counts objects without constructing whole-heap arrays.
-- M4 remaining gate: Windows Debug build fails at the PE export limit (69,406 symbols vs 65,535).
-  Allocation hooks are implemented but their supported-build stop/resume validation is pending.
-  Do not retire the old frontend or mark M4 complete before that gate passes.
+- M4 gate resolved: isolated Linux Debug standard build passed; the memory test passed 32
+  checks including matching/nonmatching allocation spaces, live heap/object/GIR inspection at
+  allocation stops, disabling/resuming and termination through the scope. Native allocation
+  pauses are explicitly **after** the outer allocator releases locks (the old in-lock hook
+  deadlocked when inspecting the heap). Release remains unsupported for allocation hooks.
+- Known platform build limitation: Windows Debug exceeds the PE DLL export limit (69,406 vs
+  65,535 symbols). Linux Debug proves the supported-build path. No Windows Debug capability
+  is claimed; the user's pinned runtime was not changed.
 
 - M5 cleanup: removed the plugin-only HTTP client and its obsolete transport test. Native
   DAP owns all current debugger requests; backend HTTP/REPL remain intact.
+
+## Retirement audit
+
+| Requirement | Authoritative replacement/evidence |
+| --- | --- |
+| Source/function breakpoints, stack, scopes, values, stepping, faults | Native DAP session/stepping/frames/faults/protocol tests; real VS Code native-debug E2E |
+| Launch passes/args/cwd/env/entry/frame settings | Native adapter launch; manifest/provider; native-debug E2E launches macro+nvm with n=6, cwd/env |
+| Pass boundaries, repeated passes, step/handoff, failure/consume | dap_pipeline test; pipeline E2E with selected sessions and restart |
+| Current/initial/history GIR and node origins | structuredGraph/passGraph from worker; GIR/pipeline E2E; dap_node_breakpoints (24 checks across NodeVM/FastVM/macro+inline) |
+| Multi-session lifecycle and stale state | pipeline E2E selected workers/restart; memory E2E selected heaps, step/end invalidation |
+| Output, diagnostics, assertion visibility | Native stdout/stderr forwarding; faults/protocol tests; expected language errors no longer become Debug assertions |
+| Memory overview/pages/explicit refresh | dap_memory (Release 20, Debug 32 checks); bilingual real UI byte/object comparisons, paging/empty/end and narrow controls |
+| Allocation/space breakpoints | Linux Debug real allocation/inspect/clear/resume/filter/terminate; Release capability/refusal and disabled UI |
+| File picker, sidebar, task selection, layout, logs, assertion overlay | Deliberately replaced by VS Code editor, selected sessions, native debug views and Debug Console; no second file browser or blocking overlay |
+
+Linux Debug debugger plan 10/10 passed after fixing unique-consumer GIR export and expected
+Debug diagnostics. Windows Release debugger plan 10/10 passed; final post-retirement runs
+also include the new origin-breakpoint case. User's pinned runtime and Marketplace release
+remain outside this goal's authorized actions.
+
+## Completion evidence — 2026-10-16
+
+- Standard Windows Release and isolated Linux Debug builds passed. Final debugger plans:
+  **11/11** on each build; memory protocol **20/32** checks respectively; origin stops **24**
+  checks across NodeVM, FastVM and macro+inline. Real JSON GIR contract passed in Debug and
+  Release, including duplicate inputs sharing a unique-consumer source index.
+- Final real VS Code native-debug E2E passed (launch/configuration, values, function breakpoint,
+  step, output, graph/history and natural exit); pipeline E2E passed (macro result, history,
+  next pass, runtime handoff, selected sessions, restart and narrow controls).
+- Real memory UI E2E passed in English and Chinese: actual bytes/objects, page/end states,
+  selected worker heaps, stop/end invalidation, explicit refresh, Release support messaging
+  and narrow controls. Active memory tabs stay selected while GIR updates in the background.
+- Standalone UI/proxy/embed sources and their npm entries/dependencies removed in Camel
+  **32c9205d**; native index locking hardened in **7bd88c8e**. HTTP/REPL/DAP and regression
+  coverage remain. No executable/documentation points to the retired frontend.
+- Expected diagnostics no longer become Debug assertions (**e1b46bc6**); duplicate-input
+  JSON export follows current runtime use indices (**7a7ab0d2**). Allocation inspection uses
+  completed outer-allocator boundaries rather than in-lock hooks (**3cf4a038**).
+- Extension build, TypeScript, localization and compatibility checks passed. Changes are
+  committed/pushed on existing feature branches; no Marketplace release/tag and no pinned
+  runtime replacement were performed.

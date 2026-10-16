@@ -25,3 +25,9 @@ module. Preserve explicit navigation choices; a library graph merely named main 
 Function-valued DATA nodes use explicit JSON callee references for a compact function name and
 function glyph. Retain DATA semantics and the original runtime representation in inspection;
 never infer function identity from a display string. Layout uses the compact card dimensions.
+
+The secondary memory panel follows the selected native debug session. Read an aggregate once
+on first paused open, then refresh explicitly; invalidate old heap responses on stop/session
+changes. Byte/object pages scroll within their data area, controls wrap at narrow widths.
+Debug allocation stops are labelled after allocation, outside allocator locks. Explain and
+disable unsupported hooks. Subsequent steps update GIR without covering an active memory tab.

@@ -9,11 +9,11 @@ exports.run = async (vscode, workspace) => {
     const program = path.join(workspace.uri.fsPath, 'memory.cml')
     fs.writeFileSync(program, 'func double(n: int): int { return n * 2 }\nfunc main(): int sync {\n    let value = double(6)\n    println(value)\n    return 0\n}\n')
     let browser, session, frame
-    const pauses = []
+    const pauses = [], sessions = []
     const tracker = vscode.debug.registerDebugAdapterTrackerFactory('camel', {
-        createDebugAdapterTracker: s => ({ onDidSendMessage: m => {
+        createDebugAdapterTracker: s => { sessions.push(s); return { onDidSendMessage: m => {
             if (m.type === 'event' && m.event === 'camel/stopped') pauses.push({ session: s.id, body: m.body })
-        } })
+        } } }
     })
     const wait = async predicate => {
         for (let i = 0; i < 100; ++i) { if (await predicate()) return; await new Promise(r => setTimeout(r, 100)) }
@@ -24,7 +24,7 @@ exports.run = async (vscode, workspace) => {
         browser = await chromium.connectOverCDP(`http://127.0.0.1:${process.env.E2E_CDP_PORT || 19338}`)
         await wait(async () => {
             for (const page of browser.contexts().flatMap(c => c.pages())) for (const f of page.frames()) {
-                if (await f.locator('.memory-panel').count()) { frame = f; return true }
+                if (await f.locator('.memory-panel').count().catch(() => 0)) { frame = f; return true }
             }
         })
         await frame.getByText(label('Pause a Camel debug session to inspect memory.'), { exact: true }).waitFor()
@@ -37,7 +37,7 @@ exports.run = async (vscode, workspace) => {
         await vscode.commands.executeCommand('camel.showMemory')
         await wait(async () => {
             for (const page of browser.contexts().flatMap(c => c.pages())) for (const f of page.frames()) {
-                if (await f.locator('.memory-panel').count()) { frame = f; return true }
+                if (await f.locator('.memory-panel').count().catch(() => 0)) { frame = f; return true }
             }
         })
         await frame.locator('.hex tbody tr').first().waitFor()
@@ -80,11 +80,41 @@ exports.run = async (vscode, workspace) => {
         assert.equal(await frame.locator('.objects tbody tr').count(), 0, 'old heap leaked into new stop')
         await frame.getByRole('button', { name: label('Refresh memory snapshot') }).click()
         await frame.locator('.objects tbody tr').first().waitFor()
+        // The selected session, rather than the first worker, supplies every heap query.
+        assert(await vscode.debug.startDebugging(undefined, { type: 'camel', request: 'launch', name: 'Second memory session', program, passes: ['std::nvm'], stopOnEntry: true }))
+        await wait(() => sessions.length === 2 && pauses.some(p => p.session === sessions[1].id))
+        const second = sessions[1]
+        await vscode.commands.executeCommand('workbench.action.debug.selectDebugSession')
+        await frame.page().locator('.quick-input-widget').getByRole('option', { name: 'Second memory session', exact: false }).click()
+        await wait(() => vscode.debug.activeDebugSession?.id === second.id)
+        await vscode.commands.executeCommand('camel.showMemory')
+        await wait(async () => {
+            for (const page of browser.contexts().flatMap(c => c.pages())) for (const f of page.frames()) {
+                if (await f.locator('.memory-panel').count().catch(() => 0)) { frame = f; return true }
+            }
+        })
+        await frame.locator('.session-name').filter({ hasText: 'Second memory session' }).waitFor()
+        await frame.locator('.objects tbody tr').first().waitFor()
+        const secondSnapshot = await second.customRequest('camel/memorySnapshot')
+        const secondRegion = secondSnapshot.regions.find(r => r.name === regionName)
+        assert.equal(await frame.locator('.detail-header code').innerText(), secondRegion.start)
+        await vscode.debug.stopDebugging(second)
+        await wait(() => vscode.debug.activeDebugSession?.id === session.id)
+        await vscode.commands.executeCommand('camel.showMemory')
+        await wait(async () => {
+            for (const page of browser.contexts().flatMap(c => c.pages())) for (const f of page.frames()) {
+                if (await f.locator('.memory-panel').count().catch(() => 0)) { frame = f; return true }
+            }
+        })
+        await frame.locator('.session-name').filter({ hasText: 'Memory UI' }).waitFor()
+        await frame.locator('.objects tbody tr').first().waitFor()
+        const firstSnapshot = await session.customRequest('camel/memorySnapshot')
+        assert.equal(await frame.locator('.detail-header code').innerText(), firstSnapshot.regions.find(r => r.name === regionName).start)
         await session.customRequest('continue', { threadId: 1 })
         await wait(() => !vscode.debug.activeDebugSession)
         await frame.getByText(label('Pause a Camel debug session to inspect memory.'), { exact: true }).waitFor()
         assert.equal(await frame.locator('.regions button').count(), 0)
-        console.log('MEMORY_UI_OK: actual heap bytes/objects, paging/end, no session, stop invalidation, refresh, Release capability and 320px controls')
+        console.log('MEMORY_UI_OK: actual heap bytes/objects, paging/end, no session, stop invalidation, selected sessions, refresh, Release capability and 320px controls')
         console.log('MEMORY_SCREENSHOTS:', workspace.uri.fsPath)
     } finally {
         tracker.dispose()
