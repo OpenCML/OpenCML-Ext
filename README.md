@@ -233,3 +233,13 @@ specific results, use `"passBreakpoints": [1, 2]` (0 = initial graph). These wor
 The session strip separates the current execution position from the inspected snapshot;
 selecting history does not run anything, and **Return to current stop** restores the live view.
 Use **Source GIR** to leave session inspection. The selected VS Code session controls the panel.
+
+
+Use **Camel: Inspect Debug Memory** from the command palette or the memory icon in a paused GIR
+session to inspect region usage and paged bytes/objects. The view uses the selected debug
+session; refresh explicitly after another stop. Release runtimes support inspection but
+allocation breakpoints require a Debug build.
+
+暂停调试时，可运行 **Camel：查看调试内存**，或点击 GIR 调试栏中的内存图标，查看区域用量、
+字节和对象分页。面板跟随所选调试会话，下一次暂停后需手动刷新。Release 运行时支持
+内存检查；分配断点需要 Debug 构建。

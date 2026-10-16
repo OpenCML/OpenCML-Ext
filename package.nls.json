@@ -59,5 +59,6 @@
     "contributes.debuggers.0.configurationAttributes.launch.properties.stepBy.description": "Step through source lines or individual GIR nodes.",
     "contributes.debuggers.0.configurationAttributes.launch.properties.frames.description": "Show function calls or all internal subgraph frames.",
     "contributes.debuggers.0.configurationAttributes.launch.properties.stopOnPassEntry.description": "Pause at the initial GIR before any compiler pass.",
-    "contributes.debuggers.0.configurationAttributes.launch.properties.passBreakpoints.description": "Pause at GIR snapshot indices: 0 is initial, N is after the Nth pass returning a graph."
+    "contributes.debuggers.0.configurationAttributes.launch.properties.passBreakpoints.description": "Pause at GIR snapshot indices: 0 is initial, N is after the Nth pass returning a graph.",
+    "camel.showMemory.title": "Inspect Debug Memory"
 }

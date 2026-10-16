@@ -30,7 +30,7 @@ func main(): int sync {
             passes: ['std::macro', 'std::inline', 'std::nvm'], stopOnPassEntry: true
         }))
         session = vscode.debug.activeDebugSession
-        browser = await chromium.connectOverCDP('http://127.0.0.1:19338')
+        browser = await chromium.connectOverCDP(`http://127.0.0.1:${process.env.E2E_CDP_PORT || 19338}`)
         let frame
         for (let i = 0; i < 100 && !frame; i++) {
             for (const page of browser.contexts().flatMap(c => c.pages())) {

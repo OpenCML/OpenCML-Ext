@@ -696,6 +696,7 @@ onUnmounted(() => {
             <button v-if="snapshotSel !== null" :disabled="debugStatus !== 'paused'" @click="snapshotSel = null; debugAction('debugCurrentGraph')">{{ t('Return to current stop') }}</button>
             <button v-if="pipelineStage" :disabled="debugStatus !== 'paused' || loading" @click="debugAction('debugNextPass')">{{ t('Next pass') }} →</button>
             <button :disabled="debugStatus !== 'paused'" @click="debugAction('debugContinue')">{{ t('Continue') }}</button>
+            <button :aria-label="t('Memory')" :title="t('Memory')" @click="debugAction('debugMemory')"><PanelIcon name="memory" :size="14" /></button>
             <button class="debug-source" :aria-label="t('Source GIR')" :title="t('Source GIR')" @click="debugAction('debugSource')"><PanelIcon name="file" :size="14" /></button>
         </section>
         <nav v-if="view === 'graph' && browsing === 'hierarchy'" class="hierarchy-bar" :aria-label='t("Graph navigation")'>

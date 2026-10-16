@@ -5,6 +5,7 @@ import { t } from '../localization'
  * breakpoints, stack, values, stepping and lifecycle belong to camel-db. */
 export interface DebugViewState {
     status: 'running' | 'paused' | 'ended'
+    allocation?: { phase: string; space: string; size: number }
     pipeline?: { index: number; pass: string | null; boundary: 'initial' | 'after' }
 }
 export class CamelDebugAdapterFactory implements vscode.DebugAdapterDescriptorFactory {
@@ -35,7 +36,7 @@ export class CamelDebugAdapterFactory implements vscode.DebugAdapterDescriptorFa
                     } else if (message.event === 'camel/stopped') {
                         const origin = Number(message.body?.frame?.node?.origin ?? 0)
                         this.onDidChangePausedNode?.(session, origin > 0 ? origin : null)
-                        const state: DebugViewState = { status: 'paused', pipeline: message.body?.pipeline }
+                        const state: DebugViewState = { status: 'paused', pipeline: message.body?.pipeline, allocation: message.body?.allocation }
                         this.states.set(session.id, state)
                         this.onDidChangeState?.(session, state)
                         this.onDidStop?.(session, state)
@@ -60,6 +61,11 @@ export class CamelDebugAdapterFactory implements vscode.DebugAdapterDescriptorFa
     currentSession(): vscode.DebugSession | null {
         const session = vscode.debug.activeDebugSession
         return session?.type === 'camel' ? session : null
+    }
+
+    currentState(): DebugViewState | undefined {
+        const session = this.currentSession()
+        return session ? this.states.get(session.id) : undefined
     }
 
     async syncNodeBreakpoints(origins: number[]): Promise<void> {

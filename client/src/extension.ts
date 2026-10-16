@@ -17,6 +17,7 @@ import { detectToolchain, spawnHint } from './toolchain'
 import { presentDiagnostics, registerDiagnosticAdvice } from './diagnosticAdvice'
 import { RuntimeStatus, inspectRuntime } from './runtimeStatus'
 import { CamelDebugAdapterFactory } from './debug/adapter'
+import { MemoryInspector } from './debug/memory'
 import { mapGirSources } from './girSource'
 import { inspectCompatibility, languageFeatures } from './compatibility'
 
@@ -252,6 +253,9 @@ function registerGirPanel(context: vscode.ExtensionContext): GirPanelState {
                         void vscode.workspace.openTextDocument({ content: message.text, language: message.text.trimStart().startsWith('{') ? 'json' : 'plaintext' })
                             .then(doc => vscode.window.showTextDocument(doc, vscode.ViewColumn.Beside))
                     }
+                    return
+                case 'debugMemory':
+                    void vscode.commands.executeCommand('camel.showMemory')
                     return
                 case 'debugNextPass':
                     void debugFactory?.currentSession()?.customRequest('camel/nextPass').then(undefined, error => vscode.window.showErrorMessage(String(error)))
@@ -496,8 +500,8 @@ async function renderDebugSession(context: vscode.ExtensionContext, state?: GirP
     }
 }
 
-function getWebviewContent(context: vscode.ExtensionContext, panel: vscode.WebviewPanel) {
-    const htmlPath = path.join(context.extensionPath, 'dist', 'panels', 'graphviz', 'index.html')
+function getWebviewContent(context: vscode.ExtensionContext, panel: vscode.WebviewPanel, panelName = 'graphviz') {
+    const htmlPath = path.join(context.extensionPath, 'dist', 'panels', panelName, 'index.html')
     let html = fs.readFileSync(htmlPath, 'utf8')
     html = html.replace(/<html[^>]*>/, `<html lang="${vscode.env.language.replace(/[^a-zA-Z0-9-]/g, '') || 'en'}">`)
 
@@ -556,6 +560,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Use Camel's native DAP; observe its events only to synchronize the graph view.
     debugFactory = new CamelDebugAdapterFactory(context)
+    const memoryInspector = new MemoryInspector(context, debugFactory, panel => getWebviewContent(context, panel, 'memory'))
     debugFactory.onDidChangePausedNode = (session, origin) => {
         if (session.id !== debugFactory?.currentSession()?.id) return
         girState?.panel.webview.postMessage({ command: 'pausedOrigin', origin })
@@ -568,6 +573,7 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.debug.registerDebugAdapterDescriptorFactory('camel', debugFactory)
     )
     debugFactory.onDidChangeState = (session, state) => {
+        memoryInspector.update(session, state)
         if (session.id !== debugFactory?.currentSession()?.id && session.id !== girState?.debugSessionId) return
         if (state.status !== 'paused' && girState?.debugSessionId === session.id) ++girState.revision
         if (girState) {

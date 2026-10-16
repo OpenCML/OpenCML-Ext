@@ -1,6 +1,7 @@
 <script setup lang="ts">
 defineProps<{ name: string; size?: number }>()
 const paths: Record<string, string> = {
+    memory: 'M6 6h12v12H6z M9 9h6v6H9z M9 3v3 M15 3v3 M9 18v3 M15 18v3 M3 9h3 M3 15h3 M18 9h3 M18 15h3',
     loop: 'M18 4l3 3-3 3 M21 7H7a4 4 0 0 0-4 4 M6 20l-3-3 3-3 M3 17h14a4 4 0 0 0 4-4',
     chevron: 'M9 5l7 7-7 7',
     follow: 'M4 7h14l-3-3 M20 17H6l3 3 M18 7l-3 3 M6 17l3-3',

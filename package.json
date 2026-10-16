@@ -260,6 +260,11 @@
                 "command": "camel.showRuntimeInfo",
                 "title": "%contributes.commands.4.title%",
                 "category": "Camel"
+            },
+            {
+                "command": "camel.showMemory",
+                "title": "%camel.showMemory.title%",
+                "category": "Camel"
             }
         ],
         "debuggers": [

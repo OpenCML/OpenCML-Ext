@@ -25,7 +25,7 @@ exports.run = async (vscode, workspace) => {
     await vscode.commands.executeCommand('camel.vizGIR')
     await vscode.commands.executeCommand('notifications.clearAll')
         await vscode.commands.executeCommand('notifications.hideToasts')
-    const browser = await chromium.connectOverCDP('http://127.0.0.1:19338')
+    const browser = await chromium.connectOverCDP(`http://127.0.0.1:${process.env.E2E_CDP_PORT || 19338}`)
     let frame
     try {
         for (const page of browser.contexts().flatMap(c => c.pages())) page.on('pageerror', error => console.log('WEBVIEW_ERROR', error.message))

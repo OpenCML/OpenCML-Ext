@@ -86,7 +86,7 @@ Unsupported build-only allocation hooks are explained, not displayed as working 
 - [x] Real VS Code tests and screenshot review in Chinese/English and narrow panels.
 
 ### M4 — Memory and remaining capabilities
-- [ ] Region overview, paged hex and objects, explicit refresh and clear pause context.
+- [x] Region overview, paged hex and objects, explicit refresh and clear pause context.
 - [ ] Allocation/space breakpoints only when supported; retain backend diagnostics.
 - [ ] Validate pagination, invalid addresses, session end and unsupported build behavior.
 
@@ -131,3 +131,11 @@ changes on the existing feature branch; no force pushes, release tags or automat
 - Boundary contract: index 0 is initial; later indices are after a pass that returned a graph.
   We do not pretend to stop inside a transformation. A consumed graph ends the sequence;
   pass stepping into a scheduler stops at runtime entry. No fictitious compiler stack/values.
+
+- M4 partial evidence: native Release memory protocol passed 20 checks; debugger plan 10/10 passed; real VS Code memory
+  UI passed English and Chinese with actual heap byte/object comparisons, paging/end, no-session
+  and ended-session states, stop invalidation, explicit refresh, unsupported allocation controls
+  and 320px controls. Overview now counts objects without constructing whole-heap arrays.
+- M4 remaining gate: Windows Debug build fails at the PE export limit (69,406 symbols vs 65,535).
+  Allocation hooks are implemented but their supported-build stop/resume validation is pending.
+  Do not retire the old frontend or mark M4 complete before that gate passes.

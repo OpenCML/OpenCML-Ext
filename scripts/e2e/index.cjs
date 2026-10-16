@@ -60,6 +60,11 @@ function run(testsRoot, callback) {
             return doc
         }
 
+        if (mode === 'memory') {
+            await require('./memory.cjs').run(vscode, workspaceFolder)
+            return
+        }
+
         if (mode === 'pipeline') {
             await require('./pipeline.cjs').run(vscode, workspaceFolder)
             return
