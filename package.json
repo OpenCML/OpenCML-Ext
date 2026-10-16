@@ -48,12 +48,6 @@
                     "default": "",
                     "description": "%contributes.configuration.properties.opencmlLanguageServer.camelDbPath.description%"
                 },
-                "opencmlLanguageServer.debugPort": {
-                    "scope": "resource",
-                    "type": "number",
-                    "default": 8765,
-                    "description": "%contributes.configuration.properties.opencmlLanguageServer.debugPort.description%"
-                },
                 "opencmlLanguageServer.maxNumberOfProblems": {
                     "scope": "resource",
                     "type": "number",
@@ -286,23 +280,67 @@
                                 "description": "%contributes.debuggers.0.configurationAttributes.launch.properties.program.description%",
                                 "default": "${file}"
                             },
-                            "debugPort": {
-                                "type": "number",
-                                "description": "%contributes.debuggers.0.configurationAttributes.launch.properties.debugPort.description%",
-                                "default": 8765
-                            },
                             "camelDbPath": {
                                 "type": "string",
                                 "description": "%contributes.debuggers.0.configurationAttributes.launch.properties.camelDbPath.description%"
-                            }
-                        }
-                    },
-                    "attach": {
-                        "properties": {
-                            "debugPort": {
-                                "type": "number",
-                                "description": "%contributes.debuggers.0.configurationAttributes.attach.properties.debugPort.description%",
-                                "default": 8765
+                            },
+                            "passes": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                },
+                                "default": [
+                                    "std::macro",
+                                    "std::inline",
+                                    "std::nvm"
+                                ],
+                                "description": "%contributes.debuggers.0.configurationAttributes.launch.properties.passes.description%"
+                            },
+                            "args": {
+                                "type": [
+                                    "array",
+                                    "object"
+                                ],
+                                "items": {
+                                    "type": "string"
+                                },
+                                "additionalProperties": true,
+                                "description": "%contributes.debuggers.0.configurationAttributes.launch.properties.args.description%"
+                            },
+                            "cwd": {
+                                "type": "string",
+                                "default": "${workspaceFolder}",
+                                "description": "%contributes.debuggers.0.configurationAttributes.launch.properties.cwd.description%"
+                            },
+                            "env": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "string"
+                                },
+                                "description": "%contributes.debuggers.0.configurationAttributes.launch.properties.env.description%"
+                            },
+                            "stopOnEntry": {
+                                "type": "boolean",
+                                "default": false,
+                                "description": "%contributes.debuggers.0.configurationAttributes.launch.properties.stopOnEntry.description%"
+                            },
+                            "stepBy": {
+                                "type": "string",
+                                "enum": [
+                                    "line",
+                                    "node"
+                                ],
+                                "default": "line",
+                                "description": "%contributes.debuggers.0.configurationAttributes.launch.properties.stepBy.description%"
+                            },
+                            "frames": {
+                                "type": "string",
+                                "enum": [
+                                    "functions",
+                                    "subgraphs"
+                                ],
+                                "default": "functions",
+                                "description": "%contributes.debuggers.0.configurationAttributes.launch.properties.frames.description%"
                             }
                         }
                     }
@@ -324,16 +362,6 @@
                             "request": "launch",
                             "name": "%contributes.debuggers.0.configurationSnippets.0.body.name%",
                             "program": "${file}"
-                        }
-                    },
-                    {
-                        "label": "%contributes.debuggers.0.configurationSnippets.1.label%",
-                        "description": "%contributes.debuggers.0.configurationSnippets.1.description%",
-                        "body": {
-                            "type": "camel",
-                            "request": "attach",
-                            "name": "%contributes.debuggers.0.configurationSnippets.1.body.name%",
-                            "debugPort": 8765
                         }
                     }
                 ]

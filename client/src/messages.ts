@@ -229,5 +229,6 @@ export const zh: Record<string, string> = {
     "Captured inputs": "捕获输入",
     "Body output feeds the next iteration. LOOP output is the final state.": "循环体输出传给下一轮，LOOP 输出最终状态。",
     "Toggle breakpoint": "切换断点",
-    "Double-click to enter the loop body": "双击进入循环体"
+    "Double-click to enter the loop body": "双击进入循环体",
+    'Could not synchronize GIR breakpoints: {0}': '无法同步 GIR 断点：{0}',
 }

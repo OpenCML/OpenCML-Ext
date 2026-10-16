@@ -50,5 +50,12 @@
     "configuration.gir.hoverNeighborhood.downstream": "下游",
     "configuration.gir.hoverNeighborhood.off": "关闭",
     "configuration.inlayHints.types": "显示变量的推断类型。",
-    "configuration.inlayHints.parameterNames": "在可明确匹配的位置实参前显示参数名。"
+    "configuration.inlayHints.parameterNames": "在可明确匹配的位置实参前显示参数名。",
+    "contributes.debuggers.0.configurationAttributes.launch.properties.passes.description": "编译与执行 pass，按顺序运行。",
+    "contributes.debuggers.0.configurationAttributes.launch.properties.args.description": "main 参数，使用 name=value 字符串数组或对象。",
+    "contributes.debuggers.0.configurationAttributes.launch.properties.cwd.description": "被调试程序的工作目录。",
+    "contributes.debuggers.0.configurationAttributes.launch.properties.env.description": "被调试程序的环境变量。",
+    "contributes.debuggers.0.configurationAttributes.launch.properties.stopOnEntry.description": "在第一个可执行节点前暂停。",
+    "contributes.debuggers.0.configurationAttributes.launch.properties.stepBy.description": "按源码行或单个 GIR 节点单步执行。",
+    "contributes.debuggers.0.configurationAttributes.launch.properties.frames.description": "显示函数调用帧或所有内部子图帧。"
 }

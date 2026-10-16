@@ -18,7 +18,6 @@ import { presentDiagnostics, registerDiagnosticAdvice } from './diagnosticAdvice
 import { RuntimeStatus, inspectRuntime } from './runtimeStatus'
 import { CamelDebugAdapterFactory } from './debug/adapter'
 import { mapGirSources } from './girSource'
-import { apiGet, DebugHttpError } from './debug/http'
 import { inspectCompatibility, languageFeatures } from './compatibility'
 
 let client: LanguageClient | undefined
@@ -276,10 +275,10 @@ function registerGirPanel(context: vscode.ExtensionContext): GirPanelState {
                     if (['flat', 'hierarchy'].includes(message.value)) void context.workspaceState.update('gir.browsing', message.value)
                     return
                 case 'passGraphsList':
-                    void pushPassGraphs(message.target)
+                    void pushPassGraphs()
                     return
                 case 'passGraph':
-                    void pushPassGraph(message.index, message.target)
+                    void pushPassGraph(message.index)
                     return
                 case 'nodeBreakpoint': {
                     const key = String(message.nodeKey)
@@ -371,70 +370,36 @@ interface PassGraphEntry {
     pass: string | null
 }
 
-/** Port camel-db is expected on (individual debug sessions may override it). */
-function getDebugPort(): number {
-    return vscode.workspace.getConfiguration('opencmlLanguageServer').get<number>('debugPort') ?? 8765
-}
-
-/** Resolve which camel-db task the pass-snapshot queries address (panel-provided target wins). */
-function resolvePassGraphTarget(explicit?: unknown): { port: number; target: string } | null {
-    const sessionTarget = debugFactory?.currentTarget() ?? null
-    if (typeof explicit === 'string' && explicit.trim()) {
-        return { port: sessionTarget?.port ?? getDebugPort(), target: explicit.trim() }
-    }
-    return sessionTarget
-}
-
-/** GET /api/pass-graphs; empty list on old camel-db (404) or any transient failure. */
+/** Snapshot requests belong to the selected VS Code session, never the first worker. */
 let passGraphError: string | undefined
-async function fetchPassGraphs(explicit?: unknown): Promise<PassGraphEntry[]> {
+async function fetchPassGraphs(): Promise<PassGraphEntry[]> {
     passGraphError = undefined
-    const t = resolvePassGraphTarget(explicit)
-    if (!t) {
-        return []
-    }
+    const session = debugFactory?.currentSession()
+    if (!session) return []
     try {
-        const data = (await apiGet(
-            t.port,
-            `/api/pass-graphs?target=${encodeURIComponent(t.target)}`
-        )) as { graphs?: { index?: unknown; pass?: unknown }[] }
-        if (!Array.isArray(data?.graphs)) {
-            return []
-        }
-        return data.graphs
-            .filter((g) => g && Number.isInteger(g.index))
-            .map((g) => ({ index: Number(g.index), pass: typeof g.pass === 'string' ? g.pass : null }))
-    } catch (error) {
-        if (error instanceof DebugHttpError && (error.status === 404 || error.status === 405)) passGraphError = error.message
-        return []
-    }
+        const data = await session.customRequest('camel/passGraphs')
+        return Array.isArray(data?.graphs) ? data.graphs : []
+    } catch (error) { passGraphError = String(error); return [] }
 }
 
 /** Push the per-pass snapshot list to the panel (empty when camel-db has none). */
-async function pushPassGraphs(explicit?: unknown): Promise<void> {
-    const graphs = await fetchPassGraphs(explicit)
+async function pushPassGraphs(): Promise<void> {
+    const graphs = await fetchPassGraphs()
     girState?.panel.webview.postMessage({ command: 'passGraphs', graphs, error: passGraphError })
 }
 
 /** GET /api/pass-graph and push one snapshot's DOT to the panel. */
-async function pushPassGraph(index: unknown, explicit?: unknown): Promise<void> {
+async function pushPassGraph(index: unknown): Promise<void> {
     const i = Number(index)
-    const target = resolvePassGraphTarget(explicit)
-    if (!target || !Number.isInteger(i)) {
+    const session = debugFactory?.currentSession()
+    if (!session || !Number.isInteger(i)) {
         girState?.panel.webview.postMessage({ command: 'passGraph', index: i, pass: null, dot: null, error: t("no debug target") })
         return
     }
     try {
-        const data = (await apiGet(
-            target.port,
-            `/api/pass-graph?target=${encodeURIComponent(target.target)}&index=${i}`
-        )) as { index?: unknown; pass?: unknown; dot?: unknown }
-        girState?.panel.webview.postMessage({
-            command: 'passGraph',
-            index: Number.isInteger(data?.index) ? Number(data.index) : i,
-            pass: typeof data?.pass === 'string' ? data.pass : null,
-            dot: typeof data?.dot === 'string' ? data.dot : null
-        })
+        const data = await session.customRequest('camel/passGraph', { index: i })
+        if (session.id !== debugFactory?.currentSession()?.id) return
+        girState?.panel.webview.postMessage({ command: 'passGraph', ...data })
     } catch (error) {
         girState?.panel.webview.postMessage({ command: 'passGraph', index: i, pass: null, dot: null, error: String(error) })
     }
@@ -538,22 +503,23 @@ export function activate(context: vscode.ExtensionContext) {
         })
     )
 
-    // Debugging: bridge VSCode's DAP to the camel-db HTTP API.
+    // Use Camel's native DAP; observe its events only to synchronize the graph view.
     debugFactory = new CamelDebugAdapterFactory(context)
-    debugFactory.onDidChangePausedNode = (origin) => {
+    debugFactory.onDidChangePausedNode = (session, origin) => {
+        if (session.id !== debugFactory?.currentSession()?.id) return
         girState?.panel.webview.postMessage({ command: 'pausedOrigin', origin })
     }
-    debugFactory.onDidRefreshGirIndex = () => {
+    debugFactory.onDidRefreshGirIndex = (session) => {
+        if (session.id !== debugFactory?.currentSession()?.id) return
         void pushPassGraphs()
     }
     context.subscriptions.push(
         vscode.debug.registerDebugAdapterDescriptorFactory('camel', debugFactory)
     )
-    context.subscriptions.push(
-        vscode.debug.onDidTerminateDebugSession((session) => {
-            debugFactory?.disposeSession(session)
-        })
-    )
+    debugFactory.onDidStop = session => {
+        if (session.id !== debugFactory?.currentSession()?.id) return
+        void pushPassGraphs()
+    }
     context.subscriptions.push(
         vscode.debug.registerDebugConfigurationProvider('camel', {
             resolveDebugConfiguration(folder, config) {
@@ -562,10 +528,6 @@ export function activate(context: vscode.ExtensionContext) {
                     if (editor?.document.languageId === 'cml') {
                         config.program = editor.document.uri.fsPath
                     }
-                }
-                if (config.debugPort === undefined) {
-                    const settings = vscode.workspace.getConfiguration('opencmlLanguageServer', folder?.uri)
-                    config.debugPort = settings.get<number>('debugPort') ?? 8765
                 }
                 if (!config.camelDbPath) {
                     const settings = vscode.workspace.getConfiguration('opencmlLanguageServer', folder?.uri)

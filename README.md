@@ -3,7 +3,7 @@
 VSCode extension for the [Camel](https://github.com/OpenCML/Camel) language, centered on two things:
 
 - **GraphIR visualization** — an interactive graph view of your program's Graph IR
-- **Debugging** — launch/attach debugging of Camel scripts via `camel-db`
+- **Debugging** — native DAP debugging of Camel scripts via `camel-db`
 
 Language features (completion, navigation, rename, semantic highlighting, diagnostics and formatting) are served by the standardized Camel language server (`camel-ls`).
 
@@ -51,18 +51,16 @@ Open a `.cml` file and use the graph button in the editor title, the editor cont
 
 ### Debugging
 
-Full debug adapter (`camel` debug type). `F5` on a `.cml` file launches `camel-db` and streams execution to the Debug Console. Supports launch (auto-spawns `camel-db`) and attach (to a running `camel-db --serve <port>`).
+The `camel` debug type launches `camel-db --dap`. Standard VS Code debug views expose
+source and function breakpoints, source-line or GIR-node stepping, call stacks, scopes,
+variables, expression inspection and exceptions. Output arrives in the Debug Console;
+the native adapter owns session cleanup and the debuggee's exit status.
 
-Capabilities:
-
-- run / continue / restart / stop, natural termination when the script finishes
-- **line breakpoints**: verified against GIR node source spans (unverified ones explain why and activate once a node maps to the line)
-- **node breakpoints**: double-click a node in the GraphIR panel (synced by node origin — the same identity the debugger reports)
-- **stepping**: step over (next node in the current graph) and step in (next node anywhere), mapped to `camel-db` node-level single-step
-- stack frames mapped to source locations; the paused node is highlighted in the GraphIR panel
-- pause detection with reason (breakpoint / step)
-
-These require a Camel build with node-level debugging support (origin spans in `rgir`/`gir-json`, the GIR node hook, and the `/api/step` endpoint). The debugger has its own version scheme; its number is not comparable to the Camel runtime version. Missing HTTP endpoints are reported when used, and unsupported snapshot controls are disabled.
+Double-click a GIR node to set an origin-based node breakpoint. The GraphIR panel uses
+session-scoped DAP requests for per-pass snapshots and paused-node highlighting.
+Launch configuration supports pass chains, main arguments, cwd/env, stopOnEntry and frame
+presentation; see the example below. Native launch owns its worker and chooses a free port.
+Attaching to the old HTTP gateway is no longer offered.
 
 ### Language features
 
@@ -112,7 +110,6 @@ Compiler suggestions appear below their diagnostic messages. Use the lightbulb's
 | `opencmlLanguageServer.camelPath` | `camel` | Path to the Camel executable; sibling tools are auto-detected next to it |
 | `opencmlLanguageServer.camelLsPath` | `""` | Optional explicit `camel-ls` path |
 | `opencmlLanguageServer.camelDbPath` | `""` | Path to `camel-db` (debugger); empty = resolve next to Camel |
-| `opencmlLanguageServer.debugPort` | `8765` | Port `camel-db` serves its API on |
 | `opencmlLanguageServer.maxNumberOfProblems` | `100` | Max problems reported by the CLI fallback |
 | `opencmlLanguageServer.trace.server` | `off` | LSP traffic tracing |
 
@@ -121,12 +118,12 @@ Compiler suggestions appear below their diagnostic messages. Use the lightbulb's
 ```
 VSCode
 ├─ Language Client ──stdio──► camel-ls.exe        (standardized LSP, lives in Camel repo)
-├─ Debug Adapter ────DAP────► this extension ──HTTP──► camel-db.exe (parent + worker)
-└─ GraphIR Webview ◄─postMessage─ extension ──CLI/HTTP──► Camel (rgir passes / gir-json)
+├─ Debug views ──────DAP────► camel-db.exe --dap ──► worker debug core
+└─ GraphIR Webview ◄─postMessage─ extension ──CLI / session DAP──► Camel
 ```
 
 - Language server: `camel-ls` is spawned directly when available; otherwise the bundled Node server shells out to the Camel CLI (fallback: diagnostics and formatting only; no placeholder completion or hover).
-- Debug adapter: an inline Node adapter translates DAP to the `camel-db` HTTP API (`run`/`continue`/`step`/`restart`/`terminate`, pause polling, log streaming). Line breakpoints and stack frames are resolved through gir-json source spans; panel breakpoints and debugger hits share the GIR node origin as their common identity.
+- Debug adapter: the native Camel adapter controls execution. The extension observes its events to synchronize GIR; it does not duplicate source mapping, breakpoints or runtime values.
 
 ## Development
 
@@ -201,3 +198,30 @@ Toolbar choices for follow/pin, refresh-on-save and browse mode are remembered p
 Saved-only diagnostics do not delay source synchronization, hover, completion or navigation. Native servers may still analyze source for these features. Severity overrides affect editor presentation only, never compiler exit status. CLI timeout does not kill running programs or limit native LSP/debugger requests. These settings do not add workspace indexing, entry-point discovery or inlay hints to an older runtime.
 
 保存后诊断不会延迟源码同步、悬停、补全和跳转，原生服务仍可为这些功能分析源码。诊断级别覆盖只影响编辑器展示，不改变编译器退出状态。CLI 超时不限制程序运行、原生 LSP 或调试请求。这些配置不会为旧运行时凭空增加工作区索引、入口识别或类型提示能力。
+
+### Debugger migration
+
+The migration ledger is [docs/debugger-migration.md](docs/debugger-migration.md).
+Debug sessions now use native `camel-db --dap`; there is no second HTTP-to-DAP adapter
+inside the extension. Use a Camel build with the new DAP graph snapshot requests.
+The native adapter launches and owns its worker; attaching to the old HTTP gateway is
+not a supported launch mode. It selects its own worker port.
+
+```json
+{
+    "type": "camel",
+    "request": "launch",
+    "name": "Debug Camel",
+    "program": "${file}",
+    "passes": ["std::macro", "std::inline", "std::nvm"],
+    "args": { "n": 6 },
+    "stopOnEntry": true,
+    "stepBy": "line",
+    "frames": "functions",
+    "cwd": "${workspaceFolder}"
+}
+```
+
+Passes and main arguments are passed to Camel unchanged. `stepBy: "node"` and
+`frames: "subgraphs"` expose the lower-level execution view. VS Code's Variables,
+Call Stack, function breakpoints and exception controls use the native adapter.

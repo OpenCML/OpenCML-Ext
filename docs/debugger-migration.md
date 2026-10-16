@@ -68,10 +68,10 @@ Unsupported build-only allocation hooks are explained, not displayed as working 
 - [x] Record scope, design contract, protocol boundaries and deletion gates here.
 
 ### M1 — One debugging adapter
-- [ ] Use native camel-db DAP in the plugin; remove duplicated protocol logic.
-- [ ] Expose launch passes, main arguments, cwd/env, stopOnEntry, stepBy and frames.
-- [ ] Preserve GIR node breakpoints, current graph and historical snapshots through DAP.
-- [ ] Validate launch, breakpoints, scopes/variables, faults and session teardown.
+- [x] Use native camel-db DAP in the plugin; remove duplicated protocol logic.
+- [x] Expose launch passes, main arguments, cwd/env, stopOnEntry, stepBy and frames.
+- [x] Preserve GIR node breakpoints, current graph and historical snapshots through DAP.
+- [x] Validate launch, breakpoints, scopes/variables, faults and session teardown.
 
 ### M2 — Compiler pipeline debugging
 - [ ] Add release-capable pass boundary stops to the debug core.
@@ -112,3 +112,12 @@ changes on the existing feature branch; no force pushes, release tags or automat
   neither compiler-stage control nor the native adapter's full inspection capabilities.
 - 2026-10-16: native DAP already supports launch passes, main args, cwd/env, stopOnEntry,
   source/node steps, stack/variables, exceptions and `camel/graph`; start migration there.
+
+- M1 evidence: real VS Code `native-debug` E2E passed with main argument `n=6`,
+  macro+nvm, entry stop, parameter inspection, function breakpoint, line step, output 12,
+  current graph, historical snapshots and natural exit. Native DAP session/protocol tests
+  passed (99/85 checks). Source stepping and fault regressions passed (136/62 checks).
+- M1 decision: native DAP owns the worker and its port. Remove the old HTTP attach snippet
+  and unused debugPort controls rather than imply that a gateway attachment still works.
+  Multi-session selection uses VS Code's selected session; the graph frontend never guesses
+  the first worker. Ordinary debugging does not require LSP availability.

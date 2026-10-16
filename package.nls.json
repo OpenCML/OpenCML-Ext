@@ -50,5 +50,12 @@
     "configuration.gir.hoverNeighborhood.downstream": "Downstream",
     "configuration.gir.hoverNeighborhood.off": "Off",
     "configuration.inlayHints.types": "Show inferred variable types.",
-    "configuration.inlayHints.parameterNames": "Show parameter names before unambiguous positional arguments."
+    "configuration.inlayHints.parameterNames": "Show parameter names before unambiguous positional arguments.",
+    "contributes.debuggers.0.configurationAttributes.launch.properties.passes.description": "Compiler and execution passes, in order.",
+    "contributes.debuggers.0.configurationAttributes.launch.properties.args.description": "Main arguments as name=value strings or an object.",
+    "contributes.debuggers.0.configurationAttributes.launch.properties.cwd.description": "Working directory of the debugged program.",
+    "contributes.debuggers.0.configurationAttributes.launch.properties.env.description": "Environment variables for the debugged program.",
+    "contributes.debuggers.0.configurationAttributes.launch.properties.stopOnEntry.description": "Pause before the first executable node.",
+    "contributes.debuggers.0.configurationAttributes.launch.properties.stepBy.description": "Step through source lines or individual GIR nodes.",
+    "contributes.debuggers.0.configurationAttributes.launch.properties.frames.description": "Show function calls or all internal subgraph frames."
 }
