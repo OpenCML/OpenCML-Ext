@@ -575,6 +575,12 @@ function onMessage(event: MessageEvent) {
             browsing.value = message.browsing === 'flat' ? 'flat' : 'hierarchy'
             applyScope()
         }
+    } else if (message.command === 'literalColors') {
+        for (const kind of ['integer', 'real', 'hex', 'binary', 'string', 'constant']) {
+            const color = message.colors?.[kind]
+            if (typeof color === 'string' && /^#(?:[\da-f]{3,4}|[\da-f]{6}|[\da-f]{8})$/i.test(color)) document.documentElement.style.setProperty(`--gir-literal-${kind}`, color)
+            else document.documentElement.style.removeProperty(`--gir-literal-${kind}`)
+        }
     } else if (message.command === 'girCopied') {
         copied.value = true
         clearTimeout(copyTimer)

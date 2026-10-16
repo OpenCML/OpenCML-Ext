@@ -1,3 +1,8 @@
+## 1.11.8
+
+- Color literal DATA values using Camel lexical scopes from the active editor theme and user TextMate overrides. Highlight mixed literal containers conservatively; preserve opaque values and function labels.
+- Render BRCH/JOIN as unfilled 44×44 diamonds using the normal node font size, distinct from rectangular GATE/SYNC markers.
+
 ## 1.11.7
 
 - Hide unused top handles on DATA nodes. Preserve handles for actual incoming edges of every kind, including full-graph and projected hierarchy connections.

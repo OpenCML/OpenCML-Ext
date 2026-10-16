@@ -3,6 +3,7 @@ import { t } from '../../../../../client/src/localization'
 
 import { computed, inject } from 'vue'
 import { loopLabel, type LoopDetails } from '../loops'
+import { literalTokens } from '../literals'
 import PanelIcon from './PanelIcon.vue'
 import { Handle, Position } from '@vue-flow/core'
 
@@ -25,8 +26,10 @@ const props = defineProps<{
     selected: boolean
 }>()
 const functionValue = computed(() => props.data.attrs.function_value === '1')
+const valueTokens = computed(() => literalTokens(props.data.label, props.data.nodeType, props.data.attrs))
 const boundary = computed(() => ['ARGS', 'EXIT'].includes(props.data.nodeType))
 const compactControl = computed(() => ['BRCH', 'JOIN', 'GATE', 'SYNC'].includes(props.data.nodeType))
+const branchDiamond = computed(() => ['BRCH', 'JOIN'].includes(props.data.nodeType))
 // Use runtime kinds and explicit function-value metadata, never label text.
 const family = computed(() => boundary.value ? 'boundary'
     : functionValue.value || ['FUNC', 'CALL'].includes(props.data.nodeType) ? 'function'
@@ -56,10 +59,11 @@ const nodeTitle = computed(() => {
         :class="[
             `t-${data.nodeType.toLowerCase()}`,
             `family-${family}`,
-            { selected, boundary, 'compact-control': compactControl, 'function-value': functionValue, breakpoint: !boundary && data.breakpoint, paused: !boundary && data.paused }
+            { selected, boundary, 'branch-diamond': branchDiamond, 'compact-control': compactControl, 'function-value': functionValue, breakpoint: !boundary && data.breakpoint, paused: !boundary && data.paused }
         ]"
         :style="{ width: `${data.width}px`, height: `${data.height}px` }"
     >
+        <svg v-if="branchDiamond" class="branch-outline" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 .5 31.5 16 16 31.5 .5 16Z" /></svg>
         <template v-if="data.loop">
             <div class="loop-heading"><PanelIcon name="loop" :size="12" /><div class="gir-label" :title="nodeTitle">{{ loopLabel(data.loop) }}</div></div>
             <div class="loop-actions nodrag nopan">
@@ -69,7 +73,7 @@ const nodeTitle = computed(() => {
         </template>
         <div v-else-if="compactControl" class="gir-label">{{ data.nodeType }}</div>
         <template v-else>
-            <div class="gir-label" :title="nodeTitle"><PanelIcon v-if="family === 'function'" name="function" class="function-symbol" :size="12" />{{ boundary ? (data.nodeType === 'ARGS' ? t("Input") : t("Output")) : data.label }}</div>
+            <div class="gir-label" :title="nodeTitle"><PanelIcon v-if="family === 'function'" name="function" class="function-symbol" :size="12" /><template v-if="boundary">{{ data.nodeType === 'ARGS' ? t("Input") : t("Output") }}</template><template v-else><span v-for="(token, index) in valueTokens" :key="index" :class="token.kind ? `literal-${token.kind}` : undefined">{{ token.text }}</span></template></div>
             <div v-if="!boundary" class="gir-type">{{ functionValue ? t("Function value") : data.nodeType }}<span v-if="data.enterScope" :aria-label='t("Open subgraph")'>↗</span></div>
         </template>
         <Handle v-if="data.nodeType !== 'ARGS' && (data.nodeType !== 'DATA' || data.hasIncoming !== false)" id="t" type="target" :position="Position.Top" />
@@ -100,6 +104,17 @@ const nodeTitle = computed(() => {
 .family-operation { --node-accent: var(--vscode-charts-blue, #3794ff); border-radius: 4px; }
 .family-operation .gir-type::before { border-radius: 0; }
 .family-control { --node-accent: var(--vscode-charts-orange, #d18616); --node-line: color-mix(in srgb, var(--node-accent) 40%, var(--node-base-line)); --node-fill: color-mix(in srgb, var(--node-accent) 10%, var(--gir-bg)); border-radius: 4px; padding: 2px 6px; box-shadow: none; }
+.t-brch, .t-join { --node-accent: var(--vscode-charts-green, #4ec9b0); --node-fill: var(--gir-bg); }
+.gir-node.branch-diamond, .gir-node.branch-diamond:hover, .gir-node.branch-diamond.selected, .gir-node.branch-diamond.paused { border-color: transparent; background: transparent; padding: 0; }
+.branch-diamond .gir-label { position: relative; }
+.branch-outline { position: absolute; inset: -1px; width: calc(100% + 2px); height: calc(100% + 2px); pointer-events: none; overflow: visible; }
+.branch-outline path { fill: var(--node-fill); stroke: var(--node-line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.literal-integer { color: var(--gir-literal-integer, var(--vscode-symbolIcon-numberForeground, var(--gir-fg))); }
+.literal-real { color: var(--gir-literal-real, var(--vscode-symbolIcon-numberForeground, var(--gir-fg))); }
+.literal-hex { color: var(--gir-literal-hex, var(--vscode-symbolIcon-numberForeground, var(--gir-fg))); }
+.literal-binary { color: var(--gir-literal-binary, var(--vscode-symbolIcon-numberForeground, var(--gir-fg))); }
+.literal-string { color: var(--gir-literal-string, var(--vscode-symbolIcon-stringForeground, var(--gir-fg))); }
+.literal-constant { color: var(--gir-literal-constant, var(--vscode-symbolIcon-keywordForeground, var(--gir-fg))); }
 .function-value .gir-type { letter-spacing: 0; }
 .t-loop { padding: 7px 8px 5px; gap: 0; box-shadow: none; }
 .loop-heading { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; }

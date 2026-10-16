@@ -165,6 +165,40 @@ exports.run = async (vscode, workspace) => {
         await frame.page().screenshot({ path: path.join(workspace.uri.fsPath, 'gir-node-families-dark.png') })
         await vscode.workspace.getConfiguration('workbench').update('colorTheme', 'Default Light Modern', vscode.ConfigurationTarget.Workspace)
         await frame.waitForFunction(() => document.body.classList.contains('vscode-light'))
+        const literalFixture = 'digraph G { n [type="DATA",label="42"]; s [type="DATA",label="hello {name}",value_type="string"]; b [type="DATA",label="true"]; z [type="DATA",label="null"]; a [type="DATA",label="[1, false]"]; o [type="DATA",label="L4 {} {}"]; }'
+        await frame.evaluate(dot => window.dispatchEvent(new MessageEvent('message', { data: { command: 'render', dot } })), literalFixture)
+        await frame.locator('.literal-string').waitFor()
+        assert.equal(await frame.locator('.literal-integer').count(), 2)
+        assert.equal(await frame.locator('.literal-constant').count(), 3)
+        assert.equal(await frame.locator('.t-data').filter({ hasText: 'L4 {} {}' }).locator('[class^="literal-"]').count(), 0)
+        const tokenSettings = vscode.workspace.getConfiguration('editor')
+        const previousColors = tokenSettings.inspect('tokenColorCustomizations')?.workspaceValue
+        try {
+            await tokenSettings.update('tokenColorCustomizations', { textMateRules: [
+                { scope: 'constant.numeric.integer.cml', settings: { foreground: '#123456' } },
+                { scope: 'string.quoted.double.cml', settings: { foreground: '#974d00' } },
+                { scope: 'constant.language.cml', settings: { foreground: '#116633' } }
+            ] }, vscode.ConfigurationTarget.Workspace)
+            await frame.waitForFunction(() => getComputedStyle(document.querySelector('.literal-integer')).color === 'rgb(18, 52, 86)')
+            assert.equal(await frame.locator('.literal-string').evaluate(node => getComputedStyle(node).color), 'rgb(151, 77, 0)')
+            assert.equal(await frame.locator('.literal-constant').first().evaluate(node => getComputedStyle(node).color), 'rgb(17, 102, 51)')
+        } finally { await tokenSettings.update('tokenColorCustomizations', previousColors, vscode.ConfigurationTarget.Workspace) }
+        const branchPreview = 'digraph G { d [type="DATA",label="true"]; b [type="BRCH",label="BRCH"]; f [type="FUNC",label="on_true"]; g [type="FUNC",label="on_false"]; j [type="JOIN",label="JOIN"]; e [type="GATE",label="GATE"]; x [type="EXIT",label="EXIT"]; d -> b [type="NORM"]; b -> f [type="CTRL"]; b -> g [type="CTRL"]; f -> j [type="NORM"]; g -> j [type="NORM"]; j -> e [type="NORM"]; e -> x [type="NORM"]; }'
+        await frame.evaluate(dot => window.dispatchEvent(new MessageEvent('message', { data: { command: 'render', dot } })), branchPreview)
+        await frame.locator('.branch-diamond').first().waitFor()
+        assert.equal(await frame.locator('.branch-diamond').count(), 2)
+        const branchStyle = await frame.locator('.branch-diamond').evaluateAll(nodes => nodes.map(node => ({ width: node.offsetWidth, height: node.offsetHeight, fill: getComputedStyle(node.querySelector('path')).fill })))
+        assert(branchStyle.every(node => node.width === 44 && node.height === 44))
+        assert.equal(await frame.locator('.t-brch .gir-label').evaluate(node => getComputedStyle(node).fontSize), await frame.locator('.t-gate .gir-label').evaluate(node => getComputedStyle(node).fontSize))
+        assert.equal(branchStyle[0].fill, branchStyle[1].fill)
+        assert.notEqual(branchStyle[0].fill, await frame.locator('.t-gate').evaluate(node => getComputedStyle(node).backgroundColor))
+        await frame.getByRole('button', { name: label('Fit to view'), exact: true }).click()
+        await frame.locator('.canvas').screenshot({ path: path.join(workspace.uri.fsPath, 'gir-branch-diamonds-light.png') })
+        await vscode.workspace.getConfiguration('workbench').update('colorTheme', 'Default Dark Modern', vscode.ConfigurationTarget.Workspace)
+        await frame.waitForFunction(() => document.body.classList.contains('vscode-dark'))
+        await frame.locator('.canvas').screenshot({ path: path.join(workspace.uri.fsPath, 'gir-branch-diamonds-dark.png') })
+        await vscode.workspace.getConfiguration('workbench').update('colorTheme', 'Default Light Modern', vscode.ConfigurationTarget.Workspace)
+        await frame.waitForFunction(() => document.body.classList.contains('vscode-light'))
         await frame.evaluate(dot => window.dispatchEvent(new MessageEvent('message', { data: { command: 'render', dot } })), families.replace('n -> f', 'z -> s [type="CTRL"]; n -> f'))
         await frame.waitForFunction(() => document.querySelectorAll('.t-data [data-handleid="t"]').length === 1)
         const fixture = 'digraph G { subgraph cluster_a { label="A"; a [label="ARGS"]; b [label="EXIT"]; a -> b [label="0|0", type="WITH"]; } subgraph cluster_b { label="B"; subgraph cluster_c { c [label="DATA"]; d [label="EXIT"]; c -> d [label="0|0", type="NORM"]; } subgraph cluster_d { e [label="DATA"]; f [label="EXIT"]; e -> f [label="0|0", type="CTRL"]; } g [label="CALL"]; h [label="EXIT"]; g -> h [label="0", type="WITH_PORT"]; } }'

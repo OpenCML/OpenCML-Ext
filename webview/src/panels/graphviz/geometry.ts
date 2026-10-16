@@ -7,6 +7,7 @@ export function nodeDisplaySize(attrs: Record<string, string>, fallbackLabel: st
         return { width: Math.max(attrs.function_value === '1' ? 104 : 72, Math.min(220, textWidth + 44)), height: attrs.function_value === '1' ? 44 : 40 }
     }
     if (attrs.type === 'LOOP') return { width: 148, height: 56 }
-    if (['BRCH', 'JOIN', 'GATE', 'SYNC'].includes(attrs.type)) return { width: 44, height: 26 }
+    if (['BRCH', 'JOIN'].includes(attrs.type)) return { width: 44, height: 44 }
+    if (['GATE', 'SYNC'].includes(attrs.type)) return { width: 44, height: 26 }
     return undefined
 }

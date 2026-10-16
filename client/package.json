@@ -13,6 +13,7 @@
         "vscode": "^1.82.0"
     },
     "dependencies": {
+        "jsonc-parser": "^3.3.1",
         "vscode-languageclient": "^9.0.1"
     },
     "devDependencies": {

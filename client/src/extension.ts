@@ -19,6 +19,7 @@ import { RuntimeStatus, inspectRuntime } from './runtimeStatus'
 import { CamelDebugAdapterFactory } from './debug/adapter'
 import { MemoryInspector } from './debug/memory'
 import { launchPipeline } from './debug/pipeline'
+import { literalThemeColors } from './syntaxColors'
 import { mapGirSources } from './girSource'
 import { inspectCompatibility, languageFeatures } from './compatibility'
 
@@ -229,6 +230,7 @@ function registerGirPanel(context: vscode.ExtensionContext): GirPanelState {
         (message) => {
             switch (message.command) {
                 case 'ready':
+                    state.panel.webview.postMessage({ command: 'literalColors', colors: literalThemeColors() })
                     sendGirPreferences(context, state)
                     if (state.debugView) state.panel.webview.postMessage(state.debugView)
                     state.panel.webview.postMessage({ command: 'followSource', enabled: state.followSource })
@@ -525,6 +527,9 @@ export function activate(context: vscode.ExtensionContext) {
     runtimeStatus = new RuntimeStatus()
     context.subscriptions.push(runtimeStatus)
     registerDiagnosticAdvice(context)
+    context.subscriptions.push(vscode.window.onDidChangeActiveColorTheme(() => {
+        girState?.panel.webview.postMessage({ command: 'literalColors', colors: literalThemeColors() })
+    }))
     context.subscriptions.push(
         vscode.commands.registerCommand('camel.runPipeline', () => launchPipeline(context, false, runCamel)),
         vscode.commands.registerCommand('camel.inspectPipeline', () => launchPipeline(context, true))
@@ -639,6 +644,9 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('camel.restartServer', () => restartLanguageServer(context)),
         vscode.commands.registerCommand('camel.format', () => vscode.commands.executeCommand('editor.action.formatDocument')),
         vscode.workspace.onDidChangeConfiguration(async event => {
+            if (event.affectsConfiguration('editor.tokenColorCustomizations')) {
+                girState?.panel.webview.postMessage({ command: 'literalColors', colors: literalThemeColors() })
+            }
             const config = vscode.workspace.getConfiguration('opencmlLanguageServer')
             if (event.affectsConfiguration('opencmlLanguageServer.inlayHints') && client?.isRunning()) {
                 const feature = client.getFeature(InlayHintRequest.method)
