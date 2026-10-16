@@ -358,17 +358,6 @@
                     "dark": "./assets/logo.svg"
                 },
                 "configuration": "./language-configuration.json"
-            },
-            {
-                "id": "psl",
-                "aliases": [
-                    "Photonic Simulation Language",
-                    "psl"
-                ],
-                "extensions": [
-                    ".psl"
-                ],
-                "configuration": "./language-configuration.json"
             }
         ],
         "grammars": [
@@ -376,11 +365,6 @@
                 "language": "cml",
                 "scopeName": "source.cml",
                 "path": "./syntaxes/cml.tmLanguage.json"
-            },
-            {
-                "language": "psl",
-                "scopeName": "source.psl",
-                "path": "./syntaxes/psl.tmLanguage.json"
             }
         ],
         "semanticTokenModifiers": [

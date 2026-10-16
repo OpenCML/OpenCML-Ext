@@ -73,7 +73,7 @@ async function runCamel(): Promise<number | undefined> {
         return
     }
     const editor = vscode.window.activeTextEditor
-    if (!editor || !['cml', 'psl'].includes(editor.document.languageId)) {
+    if (!editor || editor.document.languageId !== 'cml') {
         vscode.window.showInformationMessage(t("Open a CML file first, then run Camel."))
         return
     }
@@ -91,7 +91,7 @@ async function runCamel(): Promise<number | undefined> {
         // Save the current source and other open Camel buffers in its workspace:
         // imported modules must not silently run an older on-disk version.
         const dirty = vscode.workspace.textDocuments.filter(doc => doc.isDirty && doc.uri.scheme === 'file' &&
-            ['cml', 'psl'].includes(doc.languageId) && (doc === document || (folder &&
+            doc.languageId === 'cml' && (doc === document || (folder &&
                 vscode.workspace.getWorkspaceFolder(doc.uri)?.uri.toString() === folder.uri.toString())))
         for (const doc of dirty) {
             if (!await doc.save() || doc.isDirty) {

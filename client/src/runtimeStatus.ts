@@ -44,7 +44,7 @@ export class RuntimeStatus implements vscode.Disposable {
             this.current.error || '', t("Click for runtime details, health check or restart"),
             ...(this.current.compatibility?.warnings || [])
         ].filter(Boolean).join('\n')
-        if (['cml', 'psl'].includes(vscode.window.activeTextEditor?.document.languageId || '')) this.item.show()
+        if (vscode.window.activeTextEditor?.document.languageId === 'cml') this.item.show()
         else this.item.hide()
     }
     dispose() { this.item.dispose(); this.listeners.forEach(item => item.dispose()) }
