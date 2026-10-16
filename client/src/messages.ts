@@ -164,6 +164,8 @@ export const zh: Record<string, string> = {
     "Kind": "类型",
     "Assembled type": "组装类型",
     "Data type": "数据类型",
+    "Output type": "输出类型",
+    "Not provided": "未提供",
     "Parameter": "参数",
     "Captured variable": "捕获变量",
     "Index": "索引",

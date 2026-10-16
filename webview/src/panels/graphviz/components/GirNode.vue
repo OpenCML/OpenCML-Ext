@@ -32,9 +32,10 @@ const nodeTitle = computed(() => {
         : t("Subgraph output boundary: marks the actual exit node's output; not a runtime node.")
     const kind = ({ normal: t("Normal parameter"), with: t("Context parameter"), capture: t("Captured variable") } as Record<string, string>)[data.attrs.param_kind]
     const details = [data.label]
-    if (data.attrs.value_type) details.push(`${data.nodeType === 'FILL' ? t("Assembled type") : t("Data type")}: ${data.attrs.value_type}`)
+    details.push(`${t('Output type')}: ${data.attrs.value_type || t('Not provided')}`)
     if (kind) details.push(kind)
     if (data.attrs.param_index !== undefined) details.push(t("Port index (zero-based): {0}", data.attrs.param_index))
+    if (data.enterScope) details.push(t('Double-click to enter subgraph'))
     return details.join('\n')
 })
 </script>
@@ -42,7 +43,7 @@ const nodeTitle = computed(() => {
 <template>
     <div
         class="gir-node"
-        :title="data.enterScope ? t('Double-click to enter subgraph') : undefined"
+        :title="nodeTitle"
         :class="[
             `t-${data.nodeType.toLowerCase()}`,
             { selected, boundary, breakpoint: !boundary && data.breakpoint, paused: !boundary && data.paused }
